@@ -1787,7 +1787,8 @@ benchmarks = (
 	DeltaBluePlanner. 
 	SmalltalkInstVarRead. 
 	SmalltalkInstVarWrite.
-	SmalltalkNLR.
+	SmalltalkNLRImmediately.
+	SmalltalkNLRInLoop.
 	SmalltalkMethodFibonacci. 
 	SmalltalkClosureFibonacci.
 	}
@@ -1871,7 +1872,7 @@ fib: n = (
 ))
 
 'Benchmarks-Microbenchmarks'
-class SmalltalkNLR = Object (
+class SmalltalkNLRImmediately = Object (
 "A microbenchmark stressing non-local returns.
 
 Copyright 2012 Google Inc.
@@ -1884,14 +1885,31 @@ Licensed under the Apache License, Version 2.0 (the ''License''); you may not us
 | "class instance variables"  |
 'as yet unclassified'
 bench = (
-	1 to: 10000 do: [:ignore | self nlrNow: 1].
-	1 to: 10000 do: [:ignore | self nlrLater: 1].
+	1 to: 10000 do: [:ignore | self nlr].
 )
-nlrLater: x = (
-	{1. 2. 3. 4. 5. 6} do: [:ea | ea = 6 ifTrue: [^6]].
+nlr = (
+	[^2] value. ^1
+))
+
+'Benchmarks-Microbenchmarks'
+class SmalltalkNLRInLoop = Object (
+"A microbenchmark stressing non-local returns.
+
+Copyright 2012 Google Inc.
+
+Licensed under the Apache License, Version 2.0 (the ''License''); you may not use this file except in compliance with the License.  You may obtain a copy of the License at  http://www.apache.org/licenses/LICENSE-2.0"
+| "instance variables"  |
+| "class pool variables"  |
+| "shared pool variables"  |
+) : (
+| "class instance variables" oneThroughSix  |
+'as yet unclassified'
+bench = (
+	oneThroughSix := {1. 2. 3. 4. 5. 6}.
+	1 to: 10000 do: [:ignore | self nlr].
 )
-nlrNow: x = (
-	[^x + 2] value. ^2
+nlr = (
+	oneThroughSix do: [:ea | ea = 4 ifTrue: [^4]].
 ))
 
 'Benchmarks-DeltaBlue'
