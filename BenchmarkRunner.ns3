@@ -11,10 +11,11 @@ Licensed under the Apache License, Version 2.0 (the ''License''); you may not us
 		ns DeltaBlue.
 		ns InstVarRead.
 		ns InstVarWrite.
-		ns NLR.
 		ns MethodFibonacci.
 		ns ClosureFibonacci."
-		ns Splay.
+		"ns NonlocalReturnImmediately.
+		ns NonlocalReturnInLoop.
+		"ns Splay.
 	}.
 |)
 ('as yet unclassified'
@@ -38,7 +39,7 @@ main: p args: argv = (
 			logSum:: logSum + time ln.
 		].
 		geomMean:: (logSum / n) exp / m.
-		b out.
-		(' ', geomMean printString, 'ms') out.
+		"b out."
+		(benchmark name,' in ', geomMean printString, 'ms') out.
 	].
 )) : ()
