@@ -1,15 +1,15 @@
 Newspeak3
 'Benchmarks'
 class Richards usingPlatform: p = (
-"An OS kernel simulation benchmark, originally written in BCPL by Martin Richards.
+(*An OS kernel simulation benchmark, originally written in BCPL by Martin Richards.
 
 Derived from the Smalltalk version at
 http://www.cs.ucsb.edu/~urs/oocsb/self/release/Self-4.0/objects/applications/smalltalk/smalltalkSrc/richards.st
 
 Copyright 2012 Google Inc.
 
-Licensed under the Apache License, Version 2.0 (the ''License''); you may not use this file except in compliance with the License.  You may obtain a copy of the License at  http://www.apache.org/licenses/LICENSE-2.0"|
-	"Constants"
+Licensed under the Apache License, Version 2.0 (the ''License''); you may not use this file except in compliance with the License.  You may obtain a copy of the License at  http://www.apache.org/licenses/LICENSE-2.0*)|
+	(*Constants*)
 	DeviceA = 5.
 	DeviceB = 6.
 	DevicePacketKind = 1.
@@ -192,7 +192,7 @@ createWorker: identity priority: priority work: work state: state = (
 start = (
   | workQ mark1 mark2 mark3 mark4 |
   self initTrace; initScheduler.
-  "mark1:: Time millisecondClockValue."
+  (*mark1:: Time millisecondClockValue.*)
   tracing ifTrue: [Transcript show: 'Bench mark starting'; cr].
   self
     createIdler: Idler
@@ -257,9 +257,9 @@ start = (
     work: NoWork
     state: TaskState waiting.
   tracing ifTrue: [Transcript show: 'Starting'; cr].
-  "mark2:: Time millisecondClockValue."
+  (*mark2:: Time millisecondClockValue.*)
   self schedule.
-  "mark3:: Time millisecondClockValue."
+  (*mark3:: Time millisecondClockValue.*)
   tracing
     ifTrue: 
       [Transcript show: 'Finished'; cr.
@@ -270,12 +270,12 @@ start = (
 	cr.
       Transcript cr; show: 'End of run'; cr].
   queuePacketCount = 23246 & (holdCount = 9297) ifFalse: [self error: 'wrong result'].
-  "mark4:: Time millisecondClockValue."
-"  Transcript show: '***Scheduler time = ';
+  (*mark4:: Time millisecondClockValue.*)
+(*  Transcript show: '***Scheduler time = ';
    show: (mark3 - mark2) printString;
    show: ' Total time = ';
    show: (mark4 - mark1) printString;
-   cr"
+   cr*)
 )'private'
 findTask: identity = (
   | t |
