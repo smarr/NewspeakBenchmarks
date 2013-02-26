@@ -19,8 +19,68 @@ Licensed under the Apache License, Version 2.0 (the ''License''); you may not us
 		ns DeltaBlueOpt.
 	}.
 |)
+(
+class Benchmarking usingPlatform: p = (|
+Time = p time Time.
+List = p collections OrderedCollection.
+cachedPlatform = p.
+|)
 ('as yet unclassified'
+measure: block forAtLeast: milliseconds = (
+	| results totalElapsed |
+	results: List new.
+	totalElapsed: 0.
+	
+	[totalElapsed < milliseconds] whileTrue:
+		[ | elapsed |
+		elapsed:: Time millisecondsToRun: block.
+		totalElapsed: totalElapsed + elapsed.
+		results add: elapsed].
+	
+	^summarize: results
+)
+report = (
+	benchmarks do: [:benchmark |
+		| b score |
+		b:: benchmark usingPlatform: cachedPlatform.
+
+		self measure: [b bench] forAtLeast: 500.
+		score:: measure: [b bench] forAtLeast: 2000.
+		(benchmark name, ': ', score ) out.
+	].
+)
+round: n to: quantum = (
+	^(n / quantum) rounded * quantum
+)
+summarize: results = (
+	| sum logSum mean geomMean sumSquare stdDev |
+	sum:: logSum:: 0.
+	results do:
+		[:sample |
+		sum: sum + sample.
+		logSum: logSum + sample ln].
+	mean: sum / results size.
+	geomMean: (logSum / results size) exp.
+	
+	sumSquare: 0.
+	results do:
+		[:sample |
+		| error = sample - mean. |
+		sumSquare: sumSquare + (error * error)].
+	stdDev:: (sumSquare / results size) sqrt.
+	
+	mean:: (round: mean to: 0.1) asFloat.
+	geomMean:: (round: geomMean to: 0.1) asFloat.
+	stdDev:: (round: stdDev to: 0.1) asFloat.
+	
+	^'mean=',mean printString,
+	' geom=',geomMean printString,
+	' stddev=', stdDev printString
+)) : ()'as yet unclassified'
 main: p args: argv = (
+	(Benchmarking usingPlatform: p) report
+)
+oldmain: p args: argv = (
 	| 
 	Time = p time Time.
 	|

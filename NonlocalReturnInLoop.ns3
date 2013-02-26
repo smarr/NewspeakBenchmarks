@@ -10,7 +10,7 @@ oneThroughSix = {1. 2. 3. 4. 5. 6}.
 |)
 ('as yet unclassified'
 bench = (
-	10000 timesRepeat: [self nlr].
+	50000 timesRepeat: [self nlr].
 )
 nlr = (
 	oneThroughSix do: [:ea | ea = 4 ifTrue: [^4]].
