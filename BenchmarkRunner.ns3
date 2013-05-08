@@ -50,7 +50,7 @@ report = (
 	].
 )
 round: n to: quantum = (
-	^(n / quantum) rounded * quantum
+	^(n // quantum) * quantum
 )
 summarize: results = (
 	| sum logSum mean geomMean sumSquare stdDev |
