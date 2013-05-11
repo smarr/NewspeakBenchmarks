@@ -41,7 +41,9 @@ AbsoluteWeakest
 Required
 StrengthConstants
 StrengthTable
-|Strength initialize)
+planner
+|Strength initialize.
+planner:: Planner new)
 (
 class Plan = (
 (*A Plan is an ordered list of constraints to be executed in sequence to resatisfy all currently satisfiable constraints in the face of one or more changing inputs.*)|
@@ -860,7 +862,6 @@ of: aSymbol = (
 	^StrengthConstants at: aSymbol
 ))'as yet unclassified'
 bench = (
-	| planner = Planner new. |
 	planner chainTest: 100.
 	planner projectionTest: 100.
 )) : ()

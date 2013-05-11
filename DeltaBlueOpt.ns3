@@ -47,6 +47,7 @@ absoluteWeakest = Strength name: 'absoluteWeakest' value: 1000.
 
 forward = Direction named: 'forward'.
 backward = Direction named: 'backward'.
+planner = Planner new. 
 |)
 (
 class Direction named: n = (|
@@ -811,7 +812,6 @@ resetValue = (
 	arithmeticValue:: StrengthTable at: symbolicValue.
 )) : ()'as yet unclassified'
 bench = (
-	| planner = Planner new. |
 	planner chainTest: 100.
 	planner projectionTest: 100.
 )) : ()
