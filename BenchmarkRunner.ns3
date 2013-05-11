@@ -27,17 +27,17 @@ cachedPlatform = p.
 |)
 ('as yet unclassified'
 measure: block forAtLeast: milliseconds = (
-	| results totalElapsed |
-	results: List new.
-	totalElapsed: 0.
+	| runs start elapsed score |
+	runs:: 0.
+	start:: Time millisecondClockValue.
 	
-	[totalElapsed < milliseconds] whileTrue:
-		[ | elapsed |
-		elapsed:: Time millisecondsToRun: block.
-		totalElapsed: totalElapsed + elapsed.
-		results add: elapsed].
+	[block value.
+	runs:: runs + 1.
+	elapsed:: Time millisecondClockValue - start.
+	elapsed < milliseconds] whileTrue.
 	
-	^summarize: results
+	score:: (round: runs * 1000.0 / elapsed to: 0.1) asFloat.
+	^score printString
 )
 report = (
 	benchmarks do: [:benchmark |
@@ -45,8 +45,8 @@ report = (
 		b:: benchmark usingPlatform: cachedPlatform.
 
 		self measure: [b bench] forAtLeast: 500.
-		score:: measure: [b bench] forAtLeast: 2000.
-		(benchmark name, ': ', score ) out.
+		score:: measure: [b bench] forAtLeast: 3000.
+		(benchmark name, ': ', score) out.
 	].
 )
 round: n to: quantum = (
