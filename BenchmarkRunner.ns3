@@ -4,6 +4,7 @@ class BenchmarkRunner packageUsing: ns = (
 (*Infrastructure to run a set of benchmarks and gather average run times.
 
 Copyright 2012 Google Inc.
+Copyright 2013 Ryan Macnak
 
 Licensed under the Apache License, Version 2.0 (the ''License''); you may not use this file except in compliance with the License.  You may obtain a copy of the License at  http://www.apache.org/licenses/LICENSE-2.0*)|
 	benchmarks = {
@@ -17,6 +18,7 @@ Licensed under the Apache License, Version 2.0 (the ''License''); you may not us
 		ns Richards.
 		ns DeltaBlue.
 		ns DeltaBlueOpt.
+		ns ParserCombinators.
 	}.
 |)
 (
@@ -51,56 +53,7 @@ report = (
 )
 round: n to: quantum = (
 	^(n // quantum) * quantum
-)
-summarize: results = (
-	| sum logSum mean geomMean sumSquare stdDev |
-	sum:: logSum:: 0.
-	results do:
-		[:sample |
-		sum: sum + sample.
-		logSum: logSum + sample ln].
-	mean: sum / results size.
-	geomMean: (logSum / results size) exp.
-	
-	sumSquare: 0.
-	results do:
-		[:sample |
-		| error = sample - mean. |
-		sumSquare: sumSquare + (error * error)].
-	stdDev:: (sumSquare / results size) sqrt.
-	
-	mean:: (round: mean to: 0.1) asFloat.
-	geomMean:: (round: geomMean to: 0.1) asFloat.
-	stdDev:: (round: stdDev to: 0.1) asFloat.
-	
-	^'mean=',mean printString,
-	' geom=',geomMean printString,
-	' stddev=', stdDev printString
 )) : ()'as yet unclassified'
 main: p args: argv = (
 	(Benchmarking usingPlatform: p) report
-)
-oldmain: p args: argv = (
-	| 
-	Time = p time Time.
-	|
-	
-	benchmarks do: [:benchmark |
-		| b logSum n m desc geomMean |
-		b:: benchmark usingPlatform: p.
-
-		logSum:: 0.
-		n:: 19.
-		m:: 5.
-
-		n timesRepeat: [
-			| time |
-			time:: (p time Time millisecondsToRun: [
-				m timesRepeat: [b bench]]).
-			logSum:: logSum + time ln.
-		].
-		geomMean:: (logSum / n) exp / m.
-		(*b out.*)
-		(benchmark name,' in ', geomMean printString, 'ms') out.
-	].
 )) : ()
