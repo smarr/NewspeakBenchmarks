@@ -1761,37 +1761,42 @@ Licensed under the Apache License, Version 2.0 (the ''License''); you may not us
 ) : (
 | "class instance variables"  |
 'as yet unclassified'
-bench = (
-	"SmalltalkBenchmarkRunner bench"
-	
-	self benchmarks do: [:benchmark |
-		| logSum n m geomMean |
-		logSum := 0.
-		n := 19.
-		m := 5.
-	
-		n timesRepeat: [
-			| time |
-			time := Time millisecondsToRun: [
-				m timesRepeat: [benchmark bench]].
-			
-			logSum:= logSum + time ln].
-
-		geomMean := (logSum / n) exp / m.
-
-		(benchmark name, ' in ', geomMean printString, ' ms') out]
-)
 benchmarks = (
 	^{
-	RichardsScheduler. 
-	DeltaBluePlanner. 
 	SmalltalkInstVarRead. 
 	SmalltalkInstVarWrite.
-	SmalltalkNLRImmediately.
-	SmalltalkNLRInLoop.
 	SmalltalkMethodFibonacci. 
 	SmalltalkClosureFibonacci.
+	SmalltalkNLRImmediately.
+	SmalltalkNLRInLoop.
+	RichardsScheduler. 
+	DeltaBluePlanner.
 	}
+)
+measure: block forAtLeast: milliseconds = (
+	| runs start elapsed score |
+	runs := 0.
+	start := Time millisecondClockValue.
+	
+	[block value.
+	runs := runs + 1.
+	elapsed := Time millisecondClockValue - start.
+	elapsed < milliseconds] whileTrue.
+	
+	score := (self round: runs * 1000.0 / elapsed to: 0.1) asFloat.
+	^score printString
+)
+report = (
+	"SmalltalkBenchmarkRunner report"
+	self benchmarks do: [:benchmark |
+		| score |
+		self measure: [benchmark bench] forAtLeast: 500.
+		score:= self measure: [benchmark bench] forAtLeast: 3000.
+		(benchmark name, ': ', score) out.
+	].
+)
+round: n to: quantum = (
+	^(n // quantum) * quantum
 ))
 
 'Benchmarks-Microbenchmarks'
@@ -1885,7 +1890,7 @@ Licensed under the Apache License, Version 2.0 (the ''License''); you may not us
 | "class instance variables"  |
 'as yet unclassified'
 bench = (
-	1 to: 10000 do: [:ignore | self nlr].
+	1 to: 50000 do: [:ignore | self nlr].
 )
 nlr = (
 	[^2] value. ^1
@@ -1906,7 +1911,7 @@ Licensed under the Apache License, Version 2.0 (the ''License''); you may not us
 'as yet unclassified'
 bench = (
 	oneThroughSix := {1. 2. 3. 4. 5. 6}.
-	1 to: 10000 do: [:ignore | self nlr].
+	1 to: 50000 do: [:ignore | self nlr].
 )
 nlr = (
 	oneThroughSix do: [:ea | ea = 4 ifTrue: [^4]].
