@@ -450,7 +450,7 @@ changeIn: aBlock strength: strengthSymbol = (
 	editConstraint:: EditConstraint var: self strength: strengthSymbol.
 	(editConstraint isSatisfied) ifTrue:
 		[aBlock value.
-		 Planner propagateFrom: self].
+		 propagateFrom: self].
 	editConstraint destroyConstraint.
 )
 setAll: variables to: values strength: strengthSymbol = (
@@ -473,7 +473,7 @@ setAll: variables to: values strength: strengthSymbol = (
 		 variables with: values do:
 			[:thisVar :thisValue |
 			 thisVar value: thisValue.
-			 Planner propagateFrom: thisVar]].
+			 propagateFrom: thisVar]].
 
 	(*remove edit constraints*)
 	editConstraints do: [:c | c destroyConstraint].
