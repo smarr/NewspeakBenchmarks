@@ -1813,12 +1813,13 @@ Licensed under the Apache License, Version 2.0 (the ''License''); you may not us
 | "class instance variables"  |
 'as yet unclassified'
 bench = (
-	self fib35
+	self fib25
 )
-fib35 = (
+fib25 = (
 	| fib |
-	fib:= [:n | n < 2 ifTrue: [1] ifFalse: [(fib value: n-1) + (fib value: n-2)]].
-	fib value: 35.
+	fib := nil.
+	fib := [:n | n < 2 ifTrue: [1] ifFalse: [(fib value: n-1) + (fib value: n-2)]].
+	fib value: 25.
 ))
 
 'Benchmarks-Microbenchmarks'
@@ -1870,7 +1871,7 @@ Licensed under the Apache License, Version 2.0 (the ''License''); you may not us
 | "class instance variables"  |
 'as yet unclassified'
 bench = (
-	self fib: 35
+	self fib: 25
 )
 fib: n = (
 	^n < 2 ifTrue: [1] ifFalse: [(self fib: n-1) + (self fib: n-2)]
