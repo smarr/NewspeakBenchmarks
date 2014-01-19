@@ -1,6 +1,6 @@
 Newspeak3
 'Benchmarks'
-class BenchmarkRunner packageUsing: ns = (
+class GUIBenchmarkRunner packageUsing: ns = (
 (*Infrastructure to run a set of benchmarks and gather average run times.
 
 Copyright 2012 Google Inc.
@@ -14,20 +14,44 @@ Licensed under the Apache License, Version 2.0 (the ''License''); you may not us
 		ns ClosureFibonacci.
 		ns NonlocalReturnImmediately.
 		ns NonlocalReturnInLoop.
-		ns Splay.
 		ns Richards.
 		ns DeltaBlue.
 		ns DeltaBlueOpt.
 		ns ParserCombinators.
+		 		ns Splay.
 	}.
 |)
 (
 class Benchmarking usingPlatform: p = (|
 Time = p time Time.
 List = p collections OrderedCollection.
+Subject = p hopscotch core Subject.
+Presenter = p hopscotch core Presenter.
+HopscotchWindow = p hopscotch core HopscotchWindow.
 cachedPlatform = p.
 |)
+(
+class BenchmarkPresenter onSubject: s = Presenter onSubject: s ()
 ('as yet unclassified'
+definition = (
+	^column: (benchmarks collect: [:benchmark | 
+		initially: (label: benchmark name, ': ...') deferred: [
+			| b score |	
+			b:: benchmark usingPlatform: cachedPlatform.
+			measure: [b bench] forAtLeast: 300.
+			score:: measure: [b bench] forAtLeast: 2000.
+			label: benchmark name, ': ', score
+		]
+	])
+)) : ()
+class BenchmarkSubject = Subject onModel: nil ()
+('as yet unclassified'
+createPresenter = (
+	^BenchmarkPresenter onSubject: self
+)
+title = (
+	^'Newspeak Benchmarks'
+)) : ()'as yet unclassified'
 measure: block forAtLeast: milliseconds = (
 	| runs start elapsed score |
 	runs:: 0.
@@ -42,14 +66,7 @@ measure: block forAtLeast: milliseconds = (
 	^score printString
 )
 report = (
-	benchmarks do: [:benchmark |
-		| b score |
-		b:: benchmark usingPlatform: cachedPlatform.
-
-		self measure: [b bench] forAtLeast: 300.
-		score:: measure: [b bench] forAtLeast: 2000.
-		(benchmark name, ': ', score) out.
-	].
+	HopscotchWindow openSubject: BenchmarkSubject new.
 )
 round: n to: quantum = (
 	^(n // quantum) * quantum
