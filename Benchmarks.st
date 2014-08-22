@@ -1,1806 +1,1595 @@
 Smalltalk
 package 'Benchmarks' = (
 
-'Benchmarks-DeltaBlue'
-class AbstractConstraint = Object (
-"I am an abstract class representing a system-maintainable relationship (or ''constraint'') between a set of variables. I supply a strength instance variable; concrete subclasses provide a means of storing the constrained variables and other information required to represent a constraint.
-
-Instance variables:
-	strength			the strength of this constraint <Strength>
-This code was derived by converting the Strongtalk version to Squeak, which is why the Sun Microsystems copyright and BSD license below applies.
-
-(c) 1995-1997 Sun Microsystems, Inc. ALL RIGHTS RESERVED.
-(c) 2012 Google Inc.
-
-Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
-
-* Redistributions of source code must retain the above copyright notice, 
- this  list of conditions and the following disclaimer.
-
-* Redistribution in binary form must reproduce the above copyright notice, 
-this list of conditions and the following disclaimer in the documentation and/o other materials provided with the distribution.
-
-Neither the name of Sun Microsystems or the names of contributors may 
-be used to endorse or promote products derived from this software without 
-specific prior written permission.
-
->>
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS 'AS IS' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, 
-THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS 
-BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE 
-GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT 
-LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH 
-DAMAGE.>>"
-| "instance variables" strength  |
+'Benchmarks-Microbenchmarks'
+class Benchmark = Object (
+""
+| "instance variables"  |
 | "class pool variables"  |
 | "shared pool variables"  |
-'add/remove'
-addConstraint = (
-	"Activate this constraint and attempt to satisfy it."
-
-	self addToGraph.
-	DeltaBluePlanner incrementalAdd: self.
+'as yet unclassified'
+measureForAtLeast: milliseconds = (
+	| runs start elapsed |
+	runs := 0. Smalltalk garbageCollect.
+	start := Time millisecondClockValue.
+	
+	[self run.
+	runs := runs + 1.
+	elapsed :=Time millisecondClockValue - start.
+	elapsed < milliseconds] whileTrue.
+	
+	^(runs * 1000.0 / elapsed) asFloat
 )
-addToGraph = (
-	"Add myself to the constraint graph."
-
-	self subclassResponsibility
+report = (
+	| score |
+	self setup.
+	self measureForAtLeast: 300. "Warm up"
+	Smalltalk garbageCollect. 
+	score := self measureForAtLeast: 2000.
+	Transcript cr; show: self class name; space; show: (score printShowingDecimalPlaces: 1).
+	^score
 )
-destroyConstraint = (
-	"Deactivate this constraint, remove it from the constraint graph, possibly causing other constraints to be satisfied, and destroy it."
-
-	(self isSatisfied) ifTrue: [DeltaBluePlanner incrementalRemove: self].
-	self removeFromGraph.
-)
-removeFromGraph = (
-	"Remove myself from the constraint graph."
-
-	self subclassResponsibility
-)'accessing'
-strength = (
-	"Answer my strength."
-
-	^strength
-)
-strength: strengthSymbol = (
-	"Set my strength."
-
-	strength := Strength of: strengthSymbol.
-)'planning'
-chooseMethod: mark = (
-	"Decide if I can be satisfied and record that decision. The output of the choosen method must not have the given mark and must have a walkabout strength less than that of this constraint."
-
-	self subclassResponsibility
-)
-execute = (
-	"Enforce this constraint. Assume that it is satisfied."
-
-	self subclassResponsibility
-)
-inputsDo: aBlock = (
-	"Assume that I am satisfied. Evaluate the given block on all my current input variables."
-
-	self subclassResponsibility
-)
-inputsKnown: mark = (
-	"Assume that I am satisfied. Answer true if all my current inputs are known. A variable is known if either a) it is 'stay' (i.e. it is a constant at plan execution time), b) it has the given mark (indicating that it has been computed by a constraint appearing earlier in the plan), or c) it is not determined by any constraint."
-
-	self inputsDo:
-		[: v |
-		 ((v mark = mark) or: [(v stay) or: [v determinedBy == nil]]) ifFalse:
-			[^false]].
-	^true
-)
-markUnsatisfied = (
-	"Record the fact that I am unsatisfied."
-
-	self subclassResponsibility
-)
-output = (
-	"Answer my current output variable. Raise an error if I am not currently satisfied."
-
-	self subclassResponsibility
-)
-recalculate = (
-	"Calculate the walkabout strength, the stay flag, and, if it is 'stay', the value for the current output of this constraint. Assume this constraint is satisfied."
-
-	self subclassResponsibility
-)
-satisfy: mark = (
-	"Attempt to find a way to enforce this constraint. If successful, record the solution, perhaps modifying the current dataflow graph. Answer the constraint that this constraint overrides, if there is one, or nil, if there isn't."
-	"Assume: I am not already satisfied"
-
-	| overridden out |
-	self chooseMethod: mark.
-	(self isSatisfied)
-		ifTrue:			"constraint can be satisfied"
-			["mark inputs to allow cycle detection in addPropagate"
-			 self inputsDo: [: in | in mark: mark].
-			 out := self output.
-			 overridden := out determinedBy.
-			 (overridden == nil) ifFalse: [overridden markUnsatisfied].
-			 out determinedBy: self.
-			 (DeltaBluePlanner addPropagate: self mark: mark) ifFalse:
-				[self notify:
-					('Cycle encountered adding:\   ',
-					 self printString,
-					 '\Constraint removed.') withCRs.
-				 ^nil].
-			 out mark: mark]
-		ifFalse:			"constraint cannot be satisfied"
-			[overridden := nil.
-			 (strength sameAs: (Strength required)) ifTrue:
-				[self notify: 'Failed to satisfy a required constraint']].
-	^overridden
-)'printing'
-longPrintOn: aStream = (
-
-	| bindings |
-	aStream nextPut: $(.
-	self shortPrintOn: aStream.
-	aStream space; nextPutAll: self strength printString.
-	(self isSatisfied)
-		ifTrue:
-			[aStream cr; space; space; space.
-			 self inputsDo:
-				[: in | aStream nextPutAll: 'v', in asOop printString, ' '].
-			aStream nextPutAll: '-> '.
-			aStream nextPutAll: 'v', self output asOop printString]
-		ifFalse:
-			[aStream space; nextPutAll: 'UNSATISFIED'].
-	aStream nextPut: $); cr.
-)
-printOn: aStream = (
-
-	(Sensor leftShiftDown)
-		ifTrue: [self longPrintOn: aStream]
-		ifFalse: [self shortPrintOn: aStream].
-)
-shortPrintOn: aStream = (
-
-	aStream nextPutAll: self class name, '(', self asOop printString, ')'.
-)'queries'
-includeInPlan = (
-	"Answer true if this constraint should be included in the plan. Subclasses such as EditConstraint and StayConstraint override this method to return 'false', since they are noops at plan execution time."
-
-	^true
-)
-isInput = (
-	"Normal constraints are not input constraints. An input constraint is one that depends on external state, such as the mouse, the keyboard, a clock, or some arbitrary piece of imperative code."
-
-	^false
-)
-isSatisfied = (
-	"Answer true if this constraint is satisfied in the current solution."
-
-	self subclassResponsibility
+setup = (
 )) : (
 | "class instance variables"  |
+'as yet unclassified'
+report = (
+	^self new report
 )
+reportAll = (
+	^(self subclasses sortBy: [:a :b | a name < b name]) collect:
+		[:benchmarkClass | benchmarkClass name -> benchmarkClass report]
+))
 
 'Benchmarks-DeltaBlue'
-class BinaryConstraint = AbstractConstraint (
-"I am an abstract superclass for constraints having two possible output variables.
-
-Instance variables:
-	v1, v2		possible output variables <Variable>
-	direction		one of:
-					#forward (v2 is output)
-					#backward (	v1 is output)
-					nil (not satisfied)This code was derived by converting the Strongtalk version to Squeak, which is why the Sun Microsystems copyright and BSD license below applies.
-
-(c) 1995-1997 Sun Microsystems, Inc. ALL RIGHTS RESERVED.
-(c) 2012 Google Inc.
-
-Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
-
-* Redistributions of source code must retain the above copyright notice, 
- this  list of conditions and the following disclaimer.
-
-* Redistribution in binary form must reproduce the above copyright notice, 
-this list of conditions and the following disclaimer in the documentation and/o other materials provided with the distribution.
-
-Neither the name of Sun Microsystems or the names of contributors may 
-be used to endorse or promote products derived from this software without 
-specific prior written permission.
-
->>
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS 'AS IS' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, 
-THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS 
-BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE 
-GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT 
-LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH 
-DAMAGE.>>"
+class DBBinaryConstraint = DBConstraint (
+"I am an abstract superclass for constraints having two possible output variables."
 | "instance variables" v1 v2 direction  |
 | "class pool variables"  |
 | "shared pool variables"  |
-'add/remove'
+'as yet unclassified'
 addToGraph = (
 	"Add myself to the constraint graph."
-
 	v1 addConstraint: self.
 	v2 addConstraint: self.
 	direction := nil.
 )
-removeFromGraph = (
-	"Remove myself from the constraint graph."
-
-	(v1 == nil) ifFalse: [v1 removeConstraint: self].
-	(v2 == nil) ifFalse: [v2 removeConstraint: self].
-	direction := nil.
-)'initialize-release'
-var: variable1 var: variable2 strength: strengthSymbol = (
-	"Initialize myself with the given variables and strength."
-
-	strength := Strength of: strengthSymbol.
-	v1 := variable1.
-	v2 := variable2.
-	direction := nil.
-	self addConstraint.
-)'planning'
 chooseMethod: mark = (
 	"Decide if I can be satisfied and which way I should flow based on the relative strength of the variables I relate, and record that decision."
+	v1 mark == mark ifTrue:
+		[(v2 mark ~= mark and: [strength strongerThan: v2 walkStrength]) 
+			ifTrue: [direction:= DBForward] 
+			ifFalse: [direction:= nil].
+		^self].
+	v2 mark == mark ifTrue:
+		[(v1 mark ~= mark and: [strength strongerThan: v1 walkStrength]) 
+			ifTrue: [direction:= DBBackward]
+			ifFalse: [direction:= nil].
+		^self].
 
-	(v1 mark == mark) ifTrue:		"forward or nothing"
-		[((v2 mark ~= mark) and: [strength stronger: v2 walkStrength])
-			ifTrue: [^direction := #forward]
-			ifFalse: [^direction := nil]].
-
-	(v2 mark == mark) ifTrue:		"backward or nothing"
-		[((v1 mark ~= mark) and: [strength stronger: v1 walkStrength])
-			ifTrue: [^direction := #backward]
-			ifFalse: [^direction := nil]].
-
-	"if we get here, neither variable is marked, so we have choice"
-	(v1 walkStrength weaker: v2 walkStrength)
-		ifTrue:
-			[(strength stronger: v1 walkStrength)
-				ifTrue: [^direction := #backward]
-				ifFalse: [^direction := nil]]
+	"If we get here, neither variable is marked, so we have a choice."
+    	(v1 walkStrength weakerThan: v2 walkStrength)
+		ifTrue: 
+			[direction:= (strength strongerThan: v1 walkStrength)
+				ifTrue: [DBBackward]
+				ifFalse: [nil]]
 		ifFalse:
-			[(strength stronger: v2 walkStrength)
-				ifTrue: [^direction := #forward]
-				ifFalse: [^direction := nil]].
+			[direction:= (strength strongerThan: v2 walkStrength)
+				ifTrue: [DBForward]
+				ifFalse: ["nil" DBBackward]].
 )
-execute = (
-	"Enforce this constraint. Assume that it is satisfied."
-
-	self subclassResponsibility
+input = (
+	"Answer my current input variable"
+	^direction == DBForward ifTrue: [v1] ifFalse: [v2]
 )
-inputsDo: aBlock = (
-	"Evaluate the given block on my current input variable."
-
-	(direction == #forward)
-		ifTrue: [aBlock value: v1]
-		ifFalse: [aBlock value: v2].
+inputsKnown: mark = (
+	| in |
+	in := self input.
+	^in mark == mark or: [in stay or: [in determinedBy isNil]]
+)
+isSatisfied = (
+	"Answer true if this constraint is satisfied in the current solution."
+	^direction notNil
+)
+markInputs: mark = (
+	"Mark the input variable with the given mark."
+	self input mark: mark
 )
 markUnsatisfied = (
 	"Record the fact that I am unsatisfied."
-
 	direction := nil.
 )
 output = (
 	"Answer my current output variable."
-
-	(direction == #forward)
-		ifTrue: [^v2]
-		ifFalse: [^v1]
+	^direction == DBForward ifTrue: [v2] ifFalse: [v1]
 )
 recalculate = (
 	"Calculate the walkabout strength, the stay flag, and, if it is 'stay', the value for the current output of this constraint. Assume this constraint is satisfied."
-
 	| in out |
-	(direction == #forward)
-		ifTrue: [in := v1. out := v2]
-		ifFalse: [in := v2. out := v1].
+	in := self input. out := self output.
 	out walkStrength: (strength weakest: in walkStrength).
-	out stay: (in stay).
-	(out stay) ifTrue: [self execute].		"stay optimization"
-)'queries'
-isSatisfied = (
-	"Answer true if this constraint is satisfied in the current solution."
-
-	^direction notNil
-)) : (
-| "class instance variables"  |
-)
-
-'Benchmarks-DeltaBlue'
-variableclass Constraint = AbstractConstraint (
-"I represent a system-maintainable relationship (or ''constraint'') between a set of variables. I contain a set of methods that can be executed to enforce the constraint. If I am satisfied in the current data flow graph, the method used to enforce the relationship is stored in whichMethod. If I am not satisfied, whichMethod is nil. My indexable fields contain the constrained variables.
-
-Instance variables:
-	methods			a collection of methods that can be used to
-					enforce this constraint <Array of Method>
-	whichMethod		the method currently used to enforce this constraint
-					or nil if this constraint is not satisfied <Method>This code was derived by converting the Strongtalk version to Squeak, which is why the Sun Microsystems copyright and BSD license below applies.
-
-(c) 1995-1997 Sun Microsystems, Inc. ALL RIGHTS RESERVED.
-(c) 2012 Google Inc.
-
-Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
-
-* Redistributions of source code must retain the above copyright notice, 
- this  list of conditions and the following disclaimer.
-
-* Redistribution in binary form must reproduce the above copyright notice, 
-this list of conditions and the following disclaimer in the documentation and/o other materials provided with the distribution.
-
-Neither the name of Sun Microsystems or the names of contributors may 
-be used to endorse or promote products derived from this software without 
-specific prior written permission.
-
->>
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS 'AS IS' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, 
-THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS 
-BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE 
-GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT 
-LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH 
-DAMAGE.>>"
-| "instance variables" methods whichMethod  |
-| "class pool variables"  |
-| "shared pool variables"  |
-'add/remove'
-addToGraph = (
-	"Add myself to the constraint graph."
-
-	1 to: self size do:
-		[: i | (self at: i) addConstraint: self].
-	whichMethod := nil.
+	out stay: in stay.
+	out stay ifTrue: [self execute].
 )
 removeFromGraph = (
 	"Remove myself from the constraint graph."
-
-	| v |
-	1 to: self size do:
-		[: i |
-		 v := self at: i.
-		 (v == nil) ifFalse: [v removeConstraint: self]].
-	whichMethod := nil.
-)'initialize-release'
-methods: methodList = (
-	"Initialize myself with the given methods. I am initially not bound to variables."
-
-	strength := Strength required.
-	methods := methodList asArray.
-	whichMethod := nil.
+	v1 isNil ifFalse: [v1 removeConstraint: self].
+	v2 isNil ifFalse: [v2 removeConstraint: self].
+	direction := nil.
 )
-var: variable strength: strengthSymbol = (
-	"Install myself on the given variable with the given strength."
-
-	self
-		vars: (Array with: variable)
-		strength: strengthSymbol
-)
-var: variable1 var: variable2 strength: strengthSymbol = (
-	"Install myself on the given variables with the given strength."
-
-	self
-		vars: (Array with: variable1 with: variable2)
-		strength: strengthSymbol
-)
-var: variable1 var: variable2 var: variable3 strength: strengthSymbol = (
-	"Install myself on the given variables with the given strength."
-
-	self
-		vars: (Array with: variable1 with: variable2 with: variable3)
-		strength: strengthSymbol
-)
-var: variable1 var: variable2 var: variable3 var: variable4 strength: strengthSymbol = (
-	"Install myself on the given variables with the given strength."
-
-	self
-		vars: (Array with: variable1 with: variable2 with: variable3 with: variable4)
-		strength: strengthSymbol
-)
-var: variable1 var: variable2 var: variable3 var: variable4 var: variable5 strength: strengthSymbol = (
-	"Install myself on the given variables with the given strength."
-
-	self
-		vars:
-			(Array with: variable1 with: variable2 with: variable3),
-			(Array with: variable4 with: variable5)
-		strength: strengthSymbol
-)
-var: variable1 var: variable2 var: variable3 var: variable4 var: variable5 var: variable6 strength: strengthSymbol = (
-	"Install myself on the given variables with the given strength."
-
-	self
-		vars:
-			(Array with: variable1 with: variable2 with: variable3),
-			(Array with: variable4 with: variable5 with: variable6)
-		strength: strengthSymbol
-)
-var: variable1 var: variable2 var: variable3 var: variable4 var: variable5 var: variable6 var: variable7 strength: strengthSymbol = (
-	"Install myself on the given variables with the given strength."
-
-	self
-		vars:
-			(Array with: variable1 with: variable2 with: variable3 with: variable4),
-			(Array with: variable5 with: variable6 with: variable7)
-		strength: strengthSymbol
-)
-var: variable1 var: variable2 var: variable3 var: variable4 var: variable5 var: variable6 var: variable7 var: variable8 strength: strengthSymbol = (
-	"Install myself on the given variables with the given strength."
-
-	self
-		vars:
-			(Array with: variable1 with: variable2 with: variable3 with: variable4),
-			(Array with: variable5 with: variable6 with: variable7 with: variable8)
-		strength: strengthSymbol
-)
-vars: vars strength: aSymbol = (
-	"Install myself on the given collection of variables with the given strength."
-
-	(vars size == self size) ifFalse:
-		[self error: 'Wrong number of variables for this constraint.'].
-	1 to: self size do:
-		[: i | self at: i put: (vars at: i)].
-	strength := Strength of: aSymbol.
-	self addConstraint.
-)'planning'
-chooseMethod: mark = (
-	"Decide if I can be satisfied and record that decision. The output of the choosen method must not have the given mark and must have a walkabout strength less than that of this constraint."
-
-	| bestOutStrength mOut |
-	whichMethod := nil.
-	bestOutStrength := strength.
-	methods do:
-		[: m |
-		 mOut := self at: m outIndex.
-		 ((mOut mark ~= mark) &
-		  (mOut walkStrength weaker: bestOutStrength)) ifTrue:
-			[whichMethod := m.
-			 bestOutStrength := mOut walkStrength]].
-)
-constantOutput = (
-	"Answer true if:
-	    1. I am not an input constraint such as an EditConstraint, and
-	    2. If I have any inputs, they are all marked stay."
-
-	| outIndex i |
-	(self isInput) ifTrue: [^false].
-	self inputsDo:
-		[: in | (in stay) ifFalse: [^false]].
-	^true
-)
-execute = (
-	"Enforce this constraint. Assume that it is satisfied."
-
-	whichMethod execute: self.
-)
-inputsDo: aBlock = (
-	"See comment in AbstractConstraint."
-
-	| outIndex |
-	outIndex := whichMethod outIndex.
-	1 to: self size do:
-		[: i |
-		 (i == outIndex) ifFalse:
-			[aBlock value: (self at: i)]].
-)
-markUnsatisfied = (
-	"Record the fact that I am unsatisfied."
-
-	whichMethod := nil.
-)
-output = (
-	"Answer the output variable for the currently selected method. Raise an error if the receiver is not currently satisfied."
-
-	^self at: whichMethod outIndex
-)
-outputWalkStrength = (
-	"Answer the walkabout strength to be assigned to the output of my selected method."
-
-	| minStrength currentOut methodOut |
-	minStrength := strength.
-	currentOut := self at: whichMethod outIndex.
-	1 to: methods size do:
-		[: i |
-		 methodOut := self at: ((methods at: i) outIndex).
-		 ((methodOut ~~ currentOut) and:
-		   [methodOut walkStrength weaker: minStrength]) ifTrue:
-			[minStrength := methodOut walkStrength]].
-	^minStrength
-)
-recalculate = (
-	"Calculate the walkabout strength, the stay flag, and, if it is 'stay', the value for the current output of this constraint. Assume this constraint is satisfied."
-
-	| out |
-	out := self at: whichMethod outIndex.
-	out walkStrength: self outputWalkStrength.
-	out stay: self constantOutput.
-	(out stay) ifTrue: [self execute].		"stay optimization"
-)'queries'
-isSatisfied = (
-	"Answer true if this constraint is satisfied in the current solution."
-
-	^whichMethod notNil
+var: v1p var: v2p strength: s = (
+	super strength: s.
+	v1 := v1p.
+	v2 := v2p.
 )) : (
 | "class instance variables"  |
-'instance creation'
-names: variableNames methods: methodStrings = (
-	"Create a new constraint from the given method strings. The expressions in methodStrings are compiled to produce the actual method bodies for the constraint. For example, the following builds a plus constraint:
-
-	Constraint
-		names: #(sum a b)
-		methods: #('sum := a + b'    'a := sum - b'    'b := sum - a')
-
-The constraint thus created may be bound to actual variables with a specific strength (see Constraint>bind:strength:)."
-
-	| methodList |
-	methodList := methodStrings collect:
-		[: s | Method names: variableNames methodString: s].
-	^(super new: variableNames size) methods: methodList
+'as yet unclassified'
+var: v1 var: v2 strength: s = (
+	^self new var: v1 var: v2 strength: s 
 ))
 
 'Benchmarks-DeltaBlue'
-class DeltaBluePlanner = Object (
-"One-way constraint solver, originally written in Smalltalk by John Maloney and Mario Wolczko.
+class DBConstraint = Object (
+"I am an abstract class representing a system-maintainable relationship (or ''constraint'') between a set of variables. I supply a strength instance variable; concrete subclasses provide a means of storing the constrained variables and other information required to represent a constraint."
+| "instance variables" strength  |
+| "class pool variables"  |
+| "shared pool variables"  |
+'as yet unclassified'
+addConstraint = (
+	"Activate this constraint and attempt to satisfy it."
+	self addToGraph.
+	DBThePlanner incrementalAdd: self. 
+)
+addToGraph = (
+	"Add myself to the constraint graph."
+	self subclassResponsibility
+)
+chooseMethod: mark = (
+	"Decide if I can be satisfied and record that decision. The output of the chosen method must not have the given mark and must have a walkabout strength less than that of this constraint."
+	self subclassResponsibility
+)
+execute = (
+	"Enforce this constraint. Assume that it is satisfied."
+	self subclassResponsibility
+)
+inputsKnown: mark = (
+	"Assume that I am satisfied. Answer true if all my current inputs are known. A variable is known if either a) it is 'stay' (i.e. it is a constant at plan execution time), b) it has the given mark (indicating that it has been computed by a constraint appearing earlier in the plan), or c) it is not determined by any constraint."
+	self subclassResponsibility
+)
+isInput = (
+	"Normal constraints are not input constraints. An input constraint is one that depends on external state, such as the mouse, the keyboard, a clock, or some arbitrary piece of imperative code."
+	^false
+)
+isSatisfied = (
+	"Answer true if this constraint is satisfied in the current solution."
+	self subclassResponsibility
+)
+markInputs: mark = (
+	"Set the mark of all input from the given mark."
+	self subclassResponsibility
+)
+markUnsatisfied = (
+	"Record the fact that I am unsatisfied."
+	self subclassResponsibility
+)
+output = (
+	"Answer my current output variable. Raise an error if I am not currently satisfied."
+	self subclassResponsibility
+)
+recalculate = (
+	"Calculate the walkabout strength, the stay flag, and, if it is 'stay', the value for the current output of this constraint. Assume this constraint is satisfied."
+	self subclassResponsibility
+)
+removeFromGraph = (
+	"Remove myself from the constraint graph."
+	self subclassResponsibility
+)
+satisfy: mark = (
+	"Attempt to find a way to enforce this constraint. If successful, record the solution, perhaps modifying the current dataflow graph. Answer the constraint that this constraint overrides, if there is one, or nil, if there isn't. Assume: I am not already satisfied."
+	| out overridden |
+	self chooseMethod: mark.
+	self isSatisfied ifFalse:
+		[strength == DBRequired ifTrue:
+			[Error signal: 'Could not satisfy a required constraint'].
+		^nil].
+	"constraint can be satisfied"
+	"mark inputs to allow cycle detection in addPropagate"
+	self markInputs: mark.
+	out := self output.
+	overridden := out determinedBy.
+	overridden isNil ifFalse: [overridden markUnsatisfied].
+	out determinedBy: self.
+	(DBThePlanner addPropagate: self mark: mark) ifFalse: [Error signal: 'Cycle encountered'].
+	out mark: mark.
+	^overridden
+)
+strength = (
+	^strength
+)
+strength: s = (
+	strength := s.
+)'as-yet-unclassified'
+destroyConstraint = (
+	"Deactivate this constraint, remove it from the constraint graph, possibly causing other constraints to be satisfied, and destroy it."
+	self isSatisfied ifTrue: [DBThePlanner incrementalRemove: self].
+	self removeFromGraph.
+)) : (
+| "class instance variables"  |
+)
 
-The initializers of constraints have side effects, which is poor coding style but retained to keep to benchmark close to the original.
+'Benchmarks-DeltaBlue'
+class DBDirection = Object (
+""
+| "instance variables" name  |
+| "class pool variables" Backward Forward  |
+| "shared pool variables"  |
+'as yet unclassified'
+name: n = (
+	name := n. 
+)) : (
+| "class instance variables"  |
+'as yet unclassified'
+initialize = (
+	"DBDirection initialize"
+	DBForward := self name: 'forward'.
+	DBBackward := self name: 'backward'.
+)
+name: n = (
+	^self basicNew name: n
+))
 
-This code was derived by converting the Strongtalk version to Squeak, which is why the Sun Microsystems copyright and BSD license below applies.
-
-(c) 1995-1997 Sun Microsystems, Inc. ALL RIGHTS RESERVED.
-(c) 2012 Google Inc.
-
-Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
-
-* Redistributions of source code must retain the above copyright notice, 
- this  list of conditions and the following disclaimer.
-
-* Redistribution in binary form must reproduce the above copyright notice, 
-this list of conditions and the following disclaimer in the documentation and/o other materials provided with the distribution.
-
-Neither the name of Sun Microsystems or the names of contributors may 
-be used to endorse or promote products derived from this software without 
-specific prior written permission.
-
->>
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS ''AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, 
-THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS 
-BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE 
-GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT 
-LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH 
-DAMAGE.>>"
+'Benchmarks-DeltaBlue'
+class DBEditConstraint = DBUnaryConstraint (
+"I am a unary input constraint used to mark a variable that the client wishes to change."
 | "instance variables"  |
 | "class pool variables"  |
 | "shared pool variables"  |
-) : (
-| "class instance variables" currentMark  |
-'add/remove'
-incrementalAdd: c = (
-	"Attempt to satisfy the given constraint and, if successful, incrementally update the dataflow graph."
-	"Details: If satifying the constraint is successful, it may override a weaker constraint on its output. The algorithm attempts to resatisfy that constraint using some other method. This process is repeated until either a) it reaches a variable that was not previously determined by any constraint or b) it reaches a constraint that is too weak to be satisfied using any of its methods. The variables of constraints that have been processed are marked with a unique mark value so that we know where we've been. This allows the algorithm to avoid getting into an infinite loop even if the constraint graph has an inadvertent cycle."
+'as yet unclassified'
+execute = (
+	"Edit constraints do nothing."
+)
+isInput = (
+	"I indicate that a variable is to be changed by imperative code."
+	^true
+)
+var: v strength: s = (
+	super var: v strength: s.
+	self addConstraint.
+)) : (
+| "class instance variables"  |
+)
 
+'Benchmarks-DeltaBlue'
+class DBEqualityConstraint = DBBinaryConstraint (
+"I constrain two variables to have the same value: ''v1 = v2''."
+| "instance variables"  |
+| "class pool variables"  |
+| "shared pool variables"  |
+'as yet unclassified'
+execute = (
+	"Enforce this constraint. Assume that it is satisfied."
+	self output value: self input value.
+)
+var: v1 var: v2 strength: s = (
+	super var: v1 var: v2 strength: s.
+	self addConstraint.
+)) : (
+| "class instance variables"  |
+)
+
+'Benchmarks-DeltaBlue'
+class DBPlan = Object (
+"A Plan is an ordered list of constraints to be executed in sequence to resatisfy all currently satisfiable constraints in the face of one or more changing inputs."
+| "instance variables" constraints  |
+| "class pool variables"  |
+| "shared pool variables"  |
+'as yet unclassified'
+addConstraint: c = (
+	constraints addLast: c
+)
+execute = (
+	"Execute my constraints in order."
+	constraints do: [:c | c execute]
+)
+initialize = (
+	constraints := OrderedCollection new. 
+)) : (
+| "class instance variables"  |
+)
+
+'Benchmarks-DeltaBlue'
+class DBPlanner = Object (
+""
+| "instance variables" currentMark  |
+| "class pool variables"  |
+| "shared pool variables"  |
+'as yet unclassified'
+addConstraintsConsuming: v to: list = (
+	| determining |
+	determining := v determinedBy.
+	v constraints do: [:c | (c ~= determining and: [c isSatisfied]) ifTrue: [list addLast: c]].
+)
+addPropagate: c mark: mark = (
+	"Recompute the walkabout strengths and stay flags of all variables downstream of the given constraint and recompute the actual values of all variables whose stay flag is true. If a cycle is detected, remove the given constraint and answer false. Otherwise, answer true."
+	"Details: Cycles are detected when a marked variable is encountered downstream of the given constraint. The sender is assumed to have marked the inputs of the given constraint with the given mark. Thus, encountering a marked node downstream of the output constraint means that there is a path from the constraint's output to one of its inputs."
+	| todo |
+	todo := OrderedCollection new.
+	todo addLast: c.
+	[todo isEmpty] whileFalse: [
+		| d |
+		d := todo removeLast.
+		d output mark == mark ifTrue: [self incrementalRemove: c. ^false].
+		d recalculate.
+		self addConstraintsConsuming: d output to: todo.
+	].
+	^true
+)
+extractPlanFromConstraints: constraints = (
+	"Extract a plan for resatisfaction starting from the outputs of the given constraints, usually a set of input constraints."
+	| sources |
+	sources := OrderedCollection new.
+	constraints do: [:c | (c isInput and: [c isSatisfied]) ifTrue: [sources addLast: c]].
+	^self makePlan: sources
+)
+incrementalAdd: c = (
+	"Attempt to satisfy the given constraint and, if successful, incrementally update the dataflow graph.  Details: If satisfying the constraint is successful, it may override a weaker constraint on its output. The algorithm attempts to resatisfy that constraint using some other method. This process is repeated until either a) it reaches a variable that was not previously determined by any constraint or b) it reaches a constraint that is too weak to be satisfied using any of its methods. The variables of constraints that have been processed are marked with a unique mark value so that we know where we've been. This allows the algorithm to avoid getting into an infinite loop even if the constraint graph has an inadvertent cycle."
 	| mark overridden |
 	mark := self newMark.
 	overridden := c satisfy: mark.
-	[overridden == nil] whileFalse:
-		[overridden := overridden satisfy: mark].
+	[overridden isNil] whileFalse: [overridden := overridden satisfy: mark].
 )
 incrementalRemove: c = (
 	"Entry point for retracting a constraint. Remove the given constraint and incrementally update the dataflow graph."
-	"Details: Retracting the given constraint may allow some currently unsatisfiable downstream constraint be satisfied. We thus collect a list of unsatisfied downstream constraints and attempt to satisfy each one in turn. This list is sorted by constraint strength, strongest first, as a heuristic for avoiding unnecessarily adding and then overriding weak constraints."
-	"Assume: c is satisfied."
-
+	"Details: Retracting the given constraint may allow some currently unsatisfiable downstream constraint to be satisfied. We therefore collect a list of unsatisfied downstream constraints and attempt to satisfy each one in turn. This list is traversed by constraint strength, strongest first, as a heuristic for avoiding unnecessarily adding and then overriding weak constraints. Assume: c is satisfied."
 	| out unsatisfied |
 	out := c output.
 	c markUnsatisfied.
 	c removeFromGraph.
 	unsatisfied := self removePropagateFrom: out.
-	unsatisfied do: [: u | self incrementalAdd: u].
-)'as-yet-unclassified'
-bench = (
-	DeltaBluePlanner chainTest: 100.
-	DeltaBluePlanner projectionTest: 100.
+	DBDescendingStrengths do: [:strength | 
+		unsatisfied do: [:u | 
+			u strength = strength
+				ifTrue: [self incrementalAdd: u]]].
 )
-chainTest: n = (
-	"Do chain-of-equality-constraints performance tests, printing the results in the Transcript."
-	"Planner chainTest: 100"
-
-	| vars constraints v1 v2 eqC editConstraint plan |
-	
-	self report: 'Built chain of ', n printString, ' equality constraints in' times: 1 run:
-		[vars := (0 to: n) collect: [: i | Variable new].
-		 constraints := OrderedCollection new: n.
-		 "thread a chain of equality constraints through the variables"
-		 1 to: n do:
-			[: i |
-			 v1 := (vars at: i).
-			 v2 := (vars at: i + 1).
-			 eqC := v1 requireEquals: v2.
-			 constraints add: eqC].
-		 vars last strongDefaultStay].
-
-	self report: 'Add constraint (case 1):' times: 1 run:
-		[editConstraint := EditConstraint var: (vars first) strength: #preferred].
-	self report: 'Make Plan (case 1)' times: 1 run:
-		[plan := DeltaBluePlanner extractPlanFromConstraints: (Array with: editConstraint)].
-	"Transcript show: 'Plan length: ', plan size printString, ' constraints'; cr."
-	self report: 'Execute Plan (case 1):' times: 20 run:
-		[plan execute].
-	self report: 'Remove constraint (case 1):' times: 1 run:
-		[editConstraint destroyConstraint].
-	self report: 'Setting first node: (case 1a):' times: 1 run:
-		[(vars first) setValue: 123 strength: #strongPreferred].
-	self report: 'Setting last node: (case 1b):' times: 1 run:
-		[(vars last) setValue: 321 strength: #strongPreferred].
-	"Transcript cr."
-
-	self report: 'Add constraint (case 2):' times: 1 run:
-		[editConstraint := EditConstraint var: (vars first) strength: #default].
-	self report: 'Make Plan (case 2):' times: 1 run:
-		[plan := DeltaBluePlanner extractPlanFromConstraints: (Array with: editConstraint)].
-	"Transcript show: 'Plan length: ', plan size printString, ' constraints'; cr."
-	self report: 'Execute Plan (case 2):' times: 20 run:
-		[plan execute].
-	self report: 'Remove constraint (case 2):' times: 1 run:
-		[editConstraint destroyConstraint].
-	self report: 'Setting first node: (case 2a):' times: 1 run:
-		[(vars first) setValue: 1230 strength: #weakDefault].
-	self report: 'Setting last node: (case 2b):' times: 1 run:
-		[(vars last) setValue: 3210 strength: #weakDefault].
-	"Transcript cr."
-)
-projectionTest: n = (
-"This test constructs a two sets of variables related to each other by a simple linear transformation (scale and offset). The time is measured to change a variable on either side of the mapping and to change the scale and offset factors. Results are printed in the Transcript."
-	"Planner projectionTest: 100"
-
-	| constraints scale offset src dst |
-	
-	constraints := OrderedCollection new.
-
-	self report: 'Projection test for ', n printString, ' points (Smalltalk):' times: 1 run:
-		[scale := Variable value: 10.
-		 offset := Variable value: 1000.
-		 1 to: n do:
-			[: i |
-			 src := Variable value: i.
-			 dst := Variable value: i.
-			 constraints add: (src defaultStay).
-			 constraints add:
-				(ScaleConstraint
-					var: src var: scale var: offset var: dst
-					strength: #required)]].
-	self reportChange: 'Changing a data point:'
-		var: src newValue: 17.
-	self reportChange: 'Changing a projected point:'
-		var: dst newValue: 1050.
-	self reportChange: 'Changing the scale factor:'
-		var: scale newValue: 5.
-	self reportChange: 'Changing the offset:'
-		var: offset newValue: 2000.
-)'class initialization'
 initialize = (
-	"Planner initialize"
-
-	currentMark := 1.
-)'planning/value propagation'
-extractPlanFromConstraints: constraints = (
-	"Extract a plan for resatisfaction starting from the outputs of the given constraints, usually a set of input constraints."
-
-	| sources |
-	sources := OrderedCollection new.
-	constraints do:
-		[: c | ((c isInput) and: [c isSatisfied]) ifTrue: [sources add: c]].
-	^self makePlan: sources
-)
-extractPlanFromVariables: variables = (
-	"Extract a plan from the dataflow graph having the given variables. It is assumed that the given set of variables is complete, or at least that it contains all the input variables."
-
-	| sources |
-	sources := OrderedCollection new.
-	variables do:
-		[: v |
-		 (v constraints) do:
-			[: c | ((c isInput) and: [c isSatisfied]) ifTrue: [sources add: c]]].
-	^self makePlan: sources
+	currentMark := 0.
 )
 makePlan: sources = (
 	"Extract a plan for resatisfaction starting from the given source constraints, usually a set of input constraints. This method assumes that stay optimization is desired; the plan will contain only constraints whose output variables are not stay. Constraints that do no computation, such as stay and edit constraints, are not included in the plan."
-	"Details: The outputs of a constraint are marked when it is added to the plan under construction. A constraint may be appended to the plan when all its input variables are known. A variable is known if either a) the variable is marked (indicating that has been computed by a constraint appearing earlier in the plan), b) the variable is 'stay' (i.e. it is a constant at plan execution time), or c) the variable is not determined by any constraint. The last provision is for past states of history variables, which are not stay but which are also not computed by any constraint."
-	"Assume: sources are all satisfied."
-
-	| mark plan todo c |
+	"Details: The outputs of a constraint are marked when it is added to the plan under construction. A constraint may be appended to the plan when all its input variables are known. A variable is known if either a) the variable is marked (indicating that has been computed by a constraint appearing earlier in the plan), b) the variable is 'stay' (i.e. it is a constant at plan execution time), or c) the variable is not determined by any constraint. The last provision is for past states of history variables, which are not stay but which are also not computed by any constraint. Assume: sources are all satisfied."
+	| mark plan todo |
 	mark := self newMark.
-	plan := Plan new.
+	plan := DBPlan new.
 	todo := sources.
-	[todo isEmpty] whileFalse:
-		[c := todo removeFirst.
-		 ((c output mark ~= mark) and:		"not in plan already and..."
-		  [c inputsKnown: mark]) ifTrue:		"eligible for inclusion"
-			[plan addLast: c.
-			 c output mark: mark.
-			 c := self addConstraintsConsuming: c output to: todo]].
+	[todo isEmpty] whileFalse: [
+		| c |
+		c := todo removeLast.
+		(c output mark ~= mark and: [c inputsKnown: mark]) ifTrue: [
+			"not in plan already and eligible for inclusion"
+			plan addConstraint: c.
+			c output mark: mark.
+			self addConstraintsConsuming: c output to: todo.
+		]
+	].
 	^plan
-)
-propagateFrom: v = (
-	"The given variable has changed. Propagate new values downstream."
-
-	| todo c |
-	todo := OrderedCollection new.
-	self addConstraintsConsuming: v to: todo.
-	[todo isEmpty] whileFalse:
-		[c := todo removeFirst.
-		 c execute.
-		 self addConstraintsConsuming: c output to: todo].
-)'benchmarks'
-report: string times: count run: aBlock = (
-	"Report the time required to execute the given block."
-
-	| time |
-	"time := Time millisecondsToRun: ["count timesRepeat: aBlock"]."
-	"Transcript show: string, ' ', (time // count) printString, ' milliseconds'; cr."
-)
-reportChange: title var: aVariable newValue: newValue = (
-
-	| editConstraint plan |
-	"Transcript show: title; cr."
-	self report: '  Adding Constraint:' times: 1 run:
-		[editConstraint := EditConstraint var: aVariable strength: #preferred].
-	self report: '  Making Plan' times: 1 run:
-		[plan := DeltaBluePlanner extractPlanFromConstraints: (Array with: editConstraint)].
-	"Transcript show: '  Plan size: ', plan size printString, ' constraints'; cr."
-	self report: '  Executing Plan:' times: 10 run:
-		[aVariable value: newValue. plan execute].
-	self report: '  Removing Constraint:' times: 1 run:
-		[editConstraint destroyConstraint].
-)'private'
-addConstraintsConsuming: v to: aCollection = (
-
-	| determiningC |
-	determiningC := v determinedBy.
-	v constraints do:
-		[: c |
-		 ((c == determiningC) or: [c isSatisfied not]) ifFalse:
-			[aCollection add: c]].
-)
-addPropagate: c mark: mark = (
-	"Recompute the walkabout strengths and stay flags of all variables downstream of the given constraint and recompute the actual values of all variables whose stay flag is true. If a cycle is detected, remove the given constraint and answer false. Otherwise, answer true."
-	"Details: Cycles are detected when a marked variable is encountered downstream of the given constraint. The sender is assumed to have marked the inputs of the given constraint with the given mark. Thus, encountering a marked node downstream of the output constraint means that there is a path from the constraint's output to one of its inputs."
-
-	| todo d |
-	todo := OrderedCollection with: c.
-	[todo isEmpty] whileFalse:
-		[d := todo removeFirst.
-		 (d output mark = mark) ifTrue:
-			[self incrementalRemove: c.
-			 ^false].
-		 d recalculate.
-		 self addConstraintsConsuming: d output to: todo].
-	^true
-)
-constraintsConsuming: v do: aBlock = (
-
-	| determiningC |
-	determiningC := v determinedBy.
-	v constraints do:
-		[: c |
-		 ((c == determiningC) or: [c isSatisfied not]) ifFalse:
-			[aBlock value: c]].
 )
 newMark = (
 	"Select a previously unused mark value."
-	"Details: We just keep incrementing. If necessary, the counter will turn into a LargePositiveInteger. In that case, it will be a bit slower to compute the next mark but the algorithms will all behave correctly. We reserve the value '0' to mean 'unmarked'. Thus, this generator starts at '1' and will never produce '0' as a mark value."
-
-	^currentMark := currentMark + 1
+	currentMark := currentMark + 1.
+	^currentMark
+)
+projectionTest: n = (
+	"This test constructs a two sets of variables related to each other by a simple linear transformation (scale and offset). The time is measured to change a variable on either side of the mapping and to change the scale and offset factors."
+	| scale offset src dst dests |
+	scale := DBVariable name: 'scale' initialValue: 10.
+	offset := DBVariable name: 'offset' initialValue: 1000.
+	dests := OrderedCollection new.
+	0 to: n-1 do: [:i |
+		src := DBVariable name: 'src', i printString initialValue: i.
+		dst := DBVariable name: 'dst', i printString initialValue: i.
+		dests addLast: dst.
+		DBStayConstraint var: src strength: DBNormal.
+		DBScaleConstraint source: src scale: scale offset: offset destination: dst strength: DBRequired.
+	].
+	
+	self setValueOf: src to: 17.
+	dst value = 1170 ifFalse: [Error signal: 'Projection test 1 failed!'].
+	
+	self setValueOf: dst to: 1050.
+	src value = 5 ifFalse: [Error signal: 'Projection test 2 failed!'].
+	
+	self setValueOf: scale to: 5.
+	0 to: n - 2 do:
+		[:i | (dests at: i + 1) value = (i * 5 + 1000)
+			ifFalse: [Error signal: 'Projection test 3 failed!'] ].
+	
+	self setValueOf: offset to: 2000.
+	0 to: n - 2 do:
+		[:i | (dests at: i + 1) value = (i * 5 + 2000)
+			ifFalse: [Error signal: 'Projection test 4 failed!']].
+)
+propagateFrom: v = (
+	"The given variable has changed. Propagate new values downstream."
+	| todo |
+	todo := OrderedCollection new.
+	self addConstraintsConsuming: v to: todo.
+	[todo isEmpty] whileFalse: [
+		| c |
+		c := todo removeLast.
+		c execute.
+		self addConstraintsConsuming: c output to: todo.
+	].
 )
 removePropagateFrom: out = (
 	"Update the walkabout strengths and stay flags of all variables downstream of the given constraint. Answer a collection of unsatisfied constraints sorted in order of decreasing strength."
-
-	| unsatisfied todo v nextC |
-	unsatisfied := SortedCollection sortBlock:
-		[: c1 : c2 | c1 strength stronger: c2 strength].
+	| unsatisfied todo |
 	out determinedBy: nil.
-	out walkStrength: Strength absoluteWeakest.
+	out walkStrength: DBWeakest.
 	out stay: true.
-	todo := OrderedCollection with: out.
-	[todo isEmpty] whileFalse:
-		[v := todo removeFirst.
-		 v constraints do:
-		 	[: c | (c isSatisfied) ifFalse: [unsatisfied add: c]].
-		 self constraintsConsuming: v do:
-			[: c |
-			 c recalculate.
-			 todo add: c output]].
+	unsatisfied := OrderedCollection new.
+	todo := OrderedCollection new.
+	todo addLast: out.
+	[todo isEmpty] whileFalse: [
+		| v determining |
+		v := todo removeLast.
+		v constraints do: [:c | c isSatisfied ifFalse: [unsatisfied addLast: c]].
+		determining := v determinedBy.
+		v constraints do: [:nextC | 
+			(nextC ~= determining and: [nextC isSatisfied])
+				ifTrue: [nextC recalculate. todo addLast: nextC output]].
+	].
 	^unsatisfied
-))
+)'as-yet-unclassified'
+chainTest: n = (
+	"This is the standard DeltaBlue benchmark. A long chain of equality constraints is constructed with a stay constraint on one end. An edit constraint is then added to the opposite end and the time is measured for adding and removing this constraint, and extracting and executing a constraint satisfaction plan. There are two cases. In case 1, the added constraint is stronger than the stay constraint and values must propagate down the entire length of the chain. In case 2, the added constraint is weaker than the stay constraint so it cannot be accommodated. The cost in this case is, of course, very low. Typical situations lie somewhere between these two extremes."
+	| prev first last editC editV plan |
+	1 to: n do: [:i | 
+		| name v |
+		name := 'v', i printString.	
+		v := DBVariable name: name initialValue: 0.
+		prev isNil ifFalse: [DBEqualityConstraint var: prev var: v strength: DBRequired].
+		i == 1 ifTrue: [first := v].
+		i == n ifTrue: [last := v].
+		prev := v.
+	].
 
-'Benchmarks-Richards'
-class DeviceTaskDataRecord = RBObject (
-"A DeviceTaskDataRecord is xxxxxxxxx.
-
-Instance Variables
-	pending:		<Object>
-
-pending
-	- xxxxx
-
-Copyright 2012 Google Inc.
-
-Licensed under the Apache License, Version 2.0 (the 'License'); you may not use this file except in compliance with the License.  You may obtain a copy of the License at  http://www.apache.org/licenses/LICENSE-2.0"
-| "instance variables" pending  |
-| "class pool variables"  |
-| "shared pool variables"  |
-'accessing'
-pending = (
-  ^pending
+	DBStayConstraint var: last strength: DBStrongDefault.
+	editC := DBEditConstraint var: first strength: DBPreferred.
+	editV := OrderedCollection new.
+	editV addLast: editC.
+	plan := self extractPlanFromConstraints: editV.
+	1 to: n do: [:i |
+		first value: i.
+		plan execute.
+		last value == i ifFalse: [Error signal: 'Chain test failed!'].
+	].
+	editC destroyConstraint.
 )
-pending: packet = ( 
-  pending := packet
-)'initialize'
-create = (
-  pending := NoWork
+setValueOf: var to: newValue = (
+	| editC editV plan |
+	editC := DBEditConstraint var: var strength: DBPreferred.
+	editV := OrderedCollection new.
+	editV addLast: editC.
+	plan := self extractPlanFromConstraints: editV.
+	10 timesRepeat: [var value: newValue. plan execute].
+	editC destroyConstraint.
 )) : (
 | "class instance variables"  |
-'instance creation'
-create = (
-  ^super new create
-))
-
-'Benchmarks-DeltaBlue'
-class EditConstraint = UnaryConstraint (
-"I am a unary input constraint used to mark a variable that the client wishes to change.This code was derived by converting the Strongtalk version to Squeak, which is why the Sun Microsystems copyright and BSD license below applies.
-
-(c) 1995-1997 Sun Microsystems, Inc. ALL RIGHTS RESERVED.
-(c) 2012 Google Inc.
-
-Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
-
-* Redistributions of source code must retain the above copyright notice, 
- this  list of conditions and the following disclaimer.
-
-* Redistribution in binary form must reproduce the above copyright notice, 
-this list of conditions and the following disclaimer in the documentation and/o other materials provided with the distribution.
-
-Neither the name of Sun Microsystems or the names of contributors may 
-be used to endorse or promote products derived from this software without 
-specific prior written permission.
-
->>
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS 'AS IS' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, 
-THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS 
-BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE 
-GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT 
-LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH 
-DAMAGE.>>"
-| "instance variables"  |
-| "class pool variables"  |
-| "shared pool variables"  |
-'execution'
-execute = (
-	"Edit constraints do nothing."
-)'queries'
-includeInPlan = (
-	"Edit constraints have no effect other than to control the planning process."
-
-	^false
-)
-isInput = (
-	"I indicate that a variable is to be changed by imperative code."
-
-	^true
-)) : (
-| "class instance variables"  |
-'instance creation'
-var: aVariable strength: strengthSymbol = (
-	"Install an edit constraint with the given strength on the given variable."
-
-	^(self new) var: aVariable strength: strengthSymbol
-))
-
-'Benchmarks-DeltaBlue'
-class EqualityConstraint = BinaryConstraint (
-"I constrain two variables to have the same value: ''v1 = v2''.This code was derived by converting the Strongtalk version to Squeak, which is why the Sun Microsystems copyright and BSD license below applies.
-
-(c) 1995-1997 Sun Microsystems, Inc. ALL RIGHTS RESERVED.
-(c) 2012 Google Inc.
-
-Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
-
-* Redistributions of source code must retain the above copyright notice, 
- this  list of conditions and the following disclaimer.
-
-* Redistribution in binary form must reproduce the above copyright notice, 
-this list of conditions and the following disclaimer in the documentation and/o other materials provided with the distribution.
-
-Neither the name of Sun Microsystems or the names of contributors may 
-be used to endorse or promote products derived from this software without 
-specific prior written permission.
-
->>
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS 'AS IS' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, 
-THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS 
-BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE 
-GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT 
-LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH 
-DAMAGE.>>"
-| "instance variables"  |
-| "class pool variables"  |
-| "shared pool variables"  |
-'execution'
-execute = (
-	"Enforce this constraint. Assume that it is satisfied."
-
-	(direction == #forward)
-		ifTrue: [v2 value: v1 value]
-		ifFalse: [v1 value: v2 value].
-)) : (
-| "class instance variables"  |
-'instance creation'
-var: variable1 var: variable2 strength: strengthSymbol = (
-	"Install a constraint with the given strength equating the given variables."
-
-	^(self new) var: variable1 var: variable2 strength: strengthSymbol
-))
-
-'Benchmarks-Richards'
-class HandlerTaskDataRecord = RBObject (
-"A HandlerTaskDataRecord is xxxxxxxxx.
-
-Instance Variables
-	deviceIn:		<Object>
-	workIn:		<Object>
-
-deviceIn
-	- xxxxx
-
-workIn
-	- xxxxx
-
-Copyright 2012 Google Inc.
-
-Licensed under the Apache License, Version 2.0 (the 'License'); you may not use this file except in compliance with the License.  You may obtain a copy of the License at  http://www.apache.org/licenses/LICENSE-2.0"
-| "instance variables" workIn deviceIn  |
-| "class pool variables"  |
-| "shared pool variables"  |
-'accessing'
-deviceIn = (
-  ^deviceIn
-)
-deviceIn: aPacket = (
-  deviceIn := aPacket
-)
-deviceInAdd: packet = (
-  deviceIn := self append: packet head: deviceIn
-)
-workIn = (
-  ^workIn
-)
-workIn: aWorkQueue = ( 
-  workIn := aWorkQueue
-)
-workInAdd: packet = (
-  workIn := self append: packet head: workIn
-)'initialize'
-create = (
-  workIn := deviceIn := NoWork
-)) : (
-| "class instance variables"  |
-'instance creation'
-create = (
-  ^super new create
-))
-
-'Benchmarks-Richards'
-class IdleTaskDataRecord = RBObject (
-"An IdleTaskDataRecord is xxxxxxxxx.
-
-Instance Variables
-	control:		<Object>
-	count:		<Object>
-
-control
-	- xxxxx
-
-count
-	- xxxxx
-
-Copyright 2012 Google Inc.
-
-Licensed under the Apache License, Version 2.0 (the 'License'); you may not use this file except in compliance with the License.  You may obtain a copy of the License at  http://www.apache.org/licenses/LICENSE-2.0"
-| "instance variables" control count  |
-| "class pool variables"  |
-| "shared pool variables"  |
-'accessing'
-control = (
-  ^control
-)
-control: aNumber = (
-  control := aNumber
-)
-count = (
-  ^count
-)
-count: aCount = (
-  count := aCount
-)'initialize'
-create = (
-  control := 1.
-  count := 10000
-)) : (
-| "class instance variables"  |
-'instance creation'
-create = (
-  ^super new create
-))
-
-'Benchmarks-DeltaBlue'
-class Method = Object (
-"I represent a method whose enforement procedure is stored in a Smalltalk block. Users may create custom methods by supplying an assignment expression string and a set of formal constrained variable names. See my instance creation protocol for further details.
-
-Instance variables:
-	outIndex		the index of my output variable (target of the assignment) in my constraint
-	block		block to execute to enforce the constraint <BlockContext>
-This code was derived by converting the Strongtalk version to Squeak, which is why the Sun Microsystems copyright and BSD license below applies.
-
-(c) 1995-1997 Sun Microsystems, Inc. ALL RIGHTS RESERVED.
-(c) 2012 Google Inc.
-
-Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
-
-* Redistributions of source code must retain the above copyright notice, 
- this  list of conditions and the following disclaimer.
-
-* Redistribution in binary form must reproduce the above copyright notice, 
-this list of conditions and the following disclaimer in the documentation and/o other materials provided with the distribution.
-
-Neither the name of Sun Microsystems or the names of contributors may 
-be used to endorse or promote products derived from this software without 
-specific prior written permission.
-
->>
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS 'AS IS' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, 
-THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS 
-BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE 
-GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT 
-LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH 
-DAMAGE.>>"
-| "instance variables" outIndex block  |
-| "class pool variables"  |
-| "shared pool variables"  |
-'constraint support'
-execute: variables = (
-	"Execute myself to enforce my constraint on the given variables."
-
-	block value: variables.
-)
-outIndex = (
-	"Answer the index of my output in the bindings array."
-
-	^outIndex
-)'initialize-release'
-names: variableNames methodString: methodString = (
-	"Initialize a method by compiling the given string considering the given collection of variable names to represent the parameters of the method (i.e. its inputs and outputs). A given variable may not be both an input and an output. Note: Any free variables in the methodString will be considered global (if they appear in 'Smalltalk') or temporary variables. The user is given a warning, however, since such cases are unusual and a free variable may indicate a typographical error."
-
-	| insOutsTemps ins outs temps |
-	insOutsTemps := self extractInsOutsAndTemps: methodString using: variableNames.
-	ins := insOutsTemps at: 1.
-	outs := insOutsTemps at: 2.
-	temps := insOutsTemps at: 3.
-	outIndex := self outIndexForIns: ins outs: outs temps: temps all: variableNames.
-	block := Compiler
-			evaluate:
-				((self blockPrefixForIns: ins temps: temps args: variableNames),
-				 methodString,
-				 (self blockPostfixForOuts: outs allNames: variableNames))
-			for: nil
-			logged: false.
-	(temps size > 0) ifTrue: [block fixTemps].
-)'printing'
-printOn: aStream = (
-
-	aStream
-		nextPutAll: 'Method(', self asOop printString;
-		nextPutAll: ' out: ', outIndex printString, ')'.
-)'private'
-blockPostfixForOuts: outNames allNames: allNames = (
-	"Answer a string to be used as the postfix when creating a block for this method."
-
-	| stream |
-	"make a stream and add separator to terminate user's method string"
-	stream := WriteStream on: (String new).
-	stream nextPutAll: '.'; cr.
-
-	"build the expression postfix, creating assignments for all outputs"
-	1 to: allNames size do:
-		[: index |
-		 (outNames includes: (allNames at: index)) ifTrue:
-			[stream tab; nextPutAll: '(vars at: '.
-			 stream nextPutAll: index printString, ') value: '.
-			 stream nextPutAll: (allNames at: index), '.'; cr]].
-
-	stream tab; nextPutAll: ']'; cr.
-	^stream contents
-)
-blockPrefixForIns: inNames temps: tempNames args: argNames = (
-	"Answer a string to be used as the prefix when creating a block for a method with the given input names. All constraint variables are declared as temporaries, in addition to the temporary variables from the method string. Input variable temporaries are initialized from the argument vector."
-
-	| stream |
-	stream := WriteStream on: (String new).
-
-	"build the expression prefix, making all the variables look like temps"
-	stream nextPutAll: '| '.
-	argNames do: [: v | stream nextPutAll: v; space].
-	tempNames do: [: v | stream nextPutAll: v; space].
-	stream nextPutAll: '|'; cr.
-
-	"build the block header and input assignments"
-	stream tab; nextPutAll: '[: vars |'; cr.
-	1 to: argNames size do:
-		[: index |
-		 (inNames includes: (argNames at: index)) ifTrue:
-			[stream tab; nextPutAll: (argNames at: index), ' := (vars at: '.
-			stream nextPutAll: index printString.
-			stream nextPutAll: ') value.'; cr]].
-
-	stream tab.
-	^stream contents
-)
-extractInsOutsAndTemps: methodString using: allNames = (
-	"Extract the input, output and temporary variable names from the Smalltalk expression represented by the given string. A temporary variable is one that is neither an input, an output, or a global. Answer an array containing the three lists (ins, outs, temps)."
-
-	| s parseTree ins outs temps |
-	s := (String new: 200) writeStream.
-	s nextPutAll: 'DoIt'; cr; cr.
-	s tab; nextPutAll: '| '.
-	allNames do: [: vName | s nextPutAll: vName; space].
-	s nextPutAll: '|'; cr; tab; nextPutAll: methodString.
-	parseTree := self parse: s contents.
-	ins := parseTree referenced.
-	outs := parseTree assignedTo.
-	temps := parseTree allVariables select:
-		[: v | ((allNames includes: v) not) &
-			  ((Smalltalk includesKey: v) not)].
-	^Array with: ins with: outs with: temps
-)
-outIndexForIns: inNames outs: outNames temps: tempNames all: allNames = (
-	"Answer the index of the method output in the constraint variables. Raise an error if the input and output arg lists are not disjoint or if there is not exactly one output. Warn the user if the method code has free variables (these will be made into temporaries)."
-
-	| realOuts |
-	realOuts := outNames copy removeAll: tempNames; yourself.
-	(realOuts size = 1) ifFalse:
-		[self error: 'Constraints must have exactly one output variable'].
-
-	outNames do:
-		[: v |
-		 ((inNames includes: v) and:
-		  [allNames includes: v]) ifTrue:
-			[self error: v asString, ' cannot be both input and output!']].
-
-	tempNames do:
-		[: v |
-		 Transcript show:
-			'Warning: ''', v, ''' is assumed to be a temporary.'; cr].
-
-	^allNames indexOf: (realOuts asOrderedCollection first)
-)
-parse: methodString = (
-	"Answer the Smalltalk parse tree for the given string."
-
-	^(Compiler new)
-		parse: methodString readStream
-		in: UndefinedObject
-		notifying: nil
-)) : (
-| "class instance variables"  |
-'instance creation'
-names: variableNames methodString: methodString = (
-	"Create a constraint method from the given string, an assignment statement using the given variable names. For example:
-
-		Method names: #(a b c) methodString: 'a := b * c'"
-
-	^(super new)
-		names: variableNames
-		methodString: methodString
-))
-
-'Benchmarks-Richards'
-class Packet = RBObject (
-"A Packet is xxxxxxxxx.
-
-Instance Variables
-	data:		<Object>
-	datum:		<Object>
-	identity:		<Object>
-	kind:		<Object>
-	link:		<Object>
-
-data
-	- xxxxx
-
-datum
-	- xxxxx
-
-identity
-	- xxxxx
-
-kind
-	- xxxxx
-
-link
-	- xxxxx
-
-Copyright 2012 Google Inc.
-
-Licensed under the Apache License, Version 2.0 (the 'License'); you may not use this file except in compliance with the License.  You may obtain a copy of the License at  http://www.apache.org/licenses/LICENSE-2.0"
-| "instance variables" link identity kind datum data  |
-| "class pool variables"  |
-| "shared pool variables"  |
-'accessing'
-data = (
-  ^data
-)
-datum = (
-  ^datum
-)
-datum:  someData = (
-  datum := someData
-)
-identity = (
-  ^identity
-)
-identity: anIdentity = (
-  identity := anIdentity
-)
-kind = (
-  ^kind
-)
-link = (
-  ^link
-)
-link: aWorkQueue = ( 
-  link := aWorkQueue
-)'initialize'
-link: aLink identity: anIdentity kind: aKind = ( 
-  link := aLink.
-  identity := anIdentity. 
-  kind := aKind.
-  datum := 1.
-  data := Array new: 4 withAll: 0
-)) : (
-| "class instance variables"  |
-'instance creation'
-create: link identity: identity kind: kind = ( 
-  ^super new
-    link: link
-    identity: identity
-    kind: kind
-))
-
-'Benchmarks-DeltaBlue'
-variableclass Plan = OrderedCollection (
-"A Plan is an ordered list of constraints to be executed in sequence to resatisfy all currently satisfiable constraints in the face of one or more changing inputs.This code was derived by converting the Strongtalk version to Squeak, which is why the Sun Microsystems copyright and BSD license below applies.
-
-(c) 1995-1997 Sun Microsystems, Inc. ALL RIGHTS RESERVED.
-(c) 2012 Google Inc.
-
-Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
-
-* Redistributions of source code must retain the above copyright notice, 
- this  list of conditions and the following disclaimer.
-
-* Redistribution in binary form must reproduce the above copyright notice, 
-this list of conditions and the following disclaimer in the documentation and/o other materials provided with the distribution.
-
-Neither the name of Sun Microsystems or the names of contributors may 
-be used to endorse or promote products derived from this software without 
-specific prior written permission.
-
->>
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS 'AS IS' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, 
-THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS 
-BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE 
-GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT 
-LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH 
-DAMAGE.>>"
-| "instance variables"  |
-| "class pool variables"  |
-| "shared pool variables"  |
-'execution'
-execute = (
-	"Execute my constraints in order."
-
-	self do: [: c | c execute].
-)) : (
-| "class instance variables"  |
-)
-
-'Benchmarks-Richards'
-class RBObject = Object (
-"A RBObject is xxxxxxxxx.
-
-Instance Variables
-
-Copyright 2012 Google Inc.
-
-Licensed under the Apache License, Version 2.0 (the 'License'); you may not use this file except in compliance with the License.  You may obtain a copy of the License at  http://www.apache.org/licenses/LICENSE-2.0"
-| "instance variables"  |
-| "class pool variables" DeviceA DeviceB DevicePacketKind HandlerA HandlerB Idler NoTask NoWork WorkPacketKind Worker  |
-| "shared pool variables"  |
-'utilities'
-append: packet head: queueHead = (
-  | mouse link |
-  packet link: NoWork.
-  NoWork == queueHead ifTrue: [^packet].
-  mouse := queueHead.
-  [NoWork == (link := mouse link)]
-    whileFalse: [mouse := link].
-  mouse link: packet.
-  ^queueHead
-)) : (
-| "class instance variables"  |
-'initialize'
+'as yet unclassified'
 initialize = (
-  "RBObject initialize"
-  DeviceA := 5.
-  DeviceB := 6.
-  DevicePacketKind := 1.
-  HandlerA := 3.
-  HandlerB := 4.
-  Idler := 1.
-  NoWork := nil.
-  NoTask := nil.
-  Worker := 2.
-  WorkPacketKind := 2
-))
-
-'Benchmarks-Richards'
-class RichardsScheduler = RBObject (
-"An OS kernel simulation benchmark, originally written in BCPL by Martin Richards.
-
-Derived from the Smalltalk version at
-http://www.cs.ucsb.edu/~urs/oocsb/self/release/Self-4.0/objects/applications/smalltalk/smalltalkSrc/richards.st
-
-
-Copyright 2012 Google Inc.
-
-Licensed under the Apache License, Version 2.0 (the 'License'); you may not use this file except in compliance with the License.  You may obtain a copy of the License at  http://www.apache.org/licenses/LICENSE-2.0"
-| "instance variables" taskList currentTask currentTaskIdentity taskTable tracing layout queuePacketCount holdCount  |
-| "class pool variables"  |
-| "shared pool variables"  |
-'creation'
-createDevice: identity priority: priority work: workX state: state = ( 
-  | dataX |
-  dataX := DeviceTaskDataRecord create.
-  self
-    createTask: identity
-    priority: priority
-    work: workX
-    state: state
-    function: 
-      [:work :word | | data functionWork |
-      data := word.
-      functionWork := work.
-      NoWork == functionWork
-        ifTrue:
-          [NoWork == (functionWork := data pending)
-            ifTrue: [self wait]
-            ifFalse: 
-              [data pending: NoWork.
-              self queuePacket: functionWork]]
-        ifFalse: 
-          [data pending: functionWork.
-          tracing
-            ifTrue: 
-              [self trace: functionWork datum].
-          self holdSelf]] 
-    data: dataX
-)
-createHandler: identity priority: priority work: workX state: state = ( 
-  | dataX |
-  dataX := HandlerTaskDataRecord create.
-  self
-    createTask: identity
-    priority: priority
-    work: workX
-    state: state
-    function: 
-      [:work :word | | data workPacket count devicePacket |
-      data := word.
-      NoWork == work
-        ifFalse: [WorkPacketKind == work kind 
-          ifTrue: [data workInAdd: work]
-          ifFalse: [data deviceInAdd: work]].
-      NoWork == (workPacket := data workIn)
-        ifTrue: [self wait]
-        ifFalse: 
-          [count := workPacket datum.
-          count > 4
-            ifTrue: 
-              [data workIn: workPacket link.
-              self queuePacket: workPacket]
-            ifFalse:
-              [NoWork == (devicePacket := data deviceIn)
-                ifTrue: [self wait]
-                ifFalse: 
-                  [data deviceIn: devicePacket link.
-                  devicePacket datum: (workPacket data at: count).
-                  workPacket datum: count + 1.
-                  self queuePacket: devicePacket]]]] 
-    data: dataX
-)
-createIdler: identity priority: priority work: workX state: state = ( 
-  | dataX |
-  dataX := IdleTaskDataRecord create.
-  self
-    createTask: identity
-    priority: priority
-    work: workX
-    state: state
-    function: 
-      [:work :word | | data |
-      data := word.
-      data count: data count - 1.
-      0 = data count
-        ifTrue: [self holdSelf]
-        ifFalse:
-          [0 = (data control bitAnd: 1)
-            ifTrue: 
-              [data control: data control // 2.
-              self release: DeviceA]
-            ifFalse: 
-              [data control: (data control // 2 bitXor: 53256).
-              self release: DeviceB]]] 
-    data: dataX
-)
-createPacket: link identity: identity kind: kind = ( 
-  ^Packet
-    create: link
-    identity: identity
-    kind: kind
-)
-createTask: identity priority: priority work: work state: state function: aBlock data: data = ( 
-  | t |
-  t := TaskControlBlock
-        link: taskList
-        create: identity
-        priority: priority
-        initialWorkQueue: work
-        initialState: state
-        function: aBlock
-        privateData: data.
-  taskList := t.
-  taskTable at: identity put: t
-)
-createWorker: identity priority: priority work: workX state: state = ( 
-  | dataX |
-  dataX := WorkerTaskDataRecord create.
-  self
-    createTask: identity
-    priority: priority
-    work: workX
-    state: state
-    function: 
-      [:work :word | | data |
-      data := word.
-      NoWork == work
-        ifTrue: [self wait]
-        ifFalse: 
-          [data destination: (HandlerA = data destination
-              ifTrue: [HandlerB]
-              ifFalse: [HandlerA]).
-          work identity: data destination.
-          work datum: 1.
-          1 to: 4 do: 
-            [:i | 
-            data count: data count + 1.
-            data count > 26 ifTrue: [data count: 1].
-            work data at: i put: $A asInteger + data count - 1].
-          self queuePacket: work]] 
-    data: dataX
-)'initialize'
-start = (
-  | workQ mark1 mark2 mark3 mark4 |
-  self initTrace; initScheduler.
-  mark1 := Time millisecondClockValue.
-  tracing ifTrue: [Transcript show: 'Bench mark starting'; cr].
-  self
-    createIdler: Idler
-    priority: 0
-    work: NoWork
-    state: TaskState running.
-  workQ := self
-        createPacket: NoWork
-        identity: Worker
-        kind: WorkPacketKind.
-  workQ := self
-        createPacket: workQ
-        identity: Worker
-        kind: WorkPacketKind.
-  self
-    createWorker: Worker
-    priority: 1000
-    work: workQ
-    state: TaskState waitingWithPacket.
-  workQ := self
-        createPacket: NoWork
-        identity: DeviceA
-        kind: DevicePacketKind.
-  workQ := self
-        createPacket: workQ
-        identity: DeviceA
-        kind: DevicePacketKind.
-  workQ := self
-        createPacket: workQ
-        identity: DeviceA
-        kind: DevicePacketKind.
-  self
-    createHandler: HandlerA
-    priority: 2000
-    work: workQ
-    state: TaskState waitingWithPacket.
-  workQ := self
-        createPacket: NoWork
-        identity: DeviceB
-        kind: DevicePacketKind.
-  workQ := self
-        createPacket: workQ
-        identity: DeviceB
-        kind: DevicePacketKind.
-  workQ := self
-        createPacket: workQ
-        identity: DeviceB
-        kind: DevicePacketKind.
-  self
-    createHandler: HandlerB
-    priority: 3000
-    work: workQ
-    state: TaskState waitingWithPacket.
-  self
-    createDevice: DeviceA
-    priority: 4000
-    work: NoWork
-    state: TaskState waiting.
-  self
-    createDevice: DeviceB
-    priority: 5000
-    work: NoWork
-    state: TaskState waiting.
-  tracing ifTrue: [Transcript show: 'Starting'; cr].
-  mark2 := Time millisecondClockValue.
-  self schedule.
-  mark3 := Time millisecondClockValue.
-  tracing
-    ifTrue: 
-      [Transcript show: 'Finished'; cr.
-      Transcript show: 'QueuePacket count = ' ;
-        show: queuePacketCount printString;
-	show: ' HoldCount = ';
-	show: holdCount printString;
-	cr.
-      Transcript cr; show: 'End of run'; cr].
-  queuePacketCount = 23246 & (holdCount = 9297) ifFalse: [self error: 'wrong result'].
-  mark4 := Time millisecondClockValue.
-  "Transcript show: '***Scheduler time = ';
-   show: (mark3 - mark2) printString;
-   show: ' Total time = ';
-   show: (mark4 - mark1) printString;
-   cr"
-)'private'
-findTask: identity = ( 
-  | t |
-  t := taskTable at: identity.
-  NoTask == t ifTrue: [self error: 'findTask failed'].
-  ^t
-)
-holdSelf = (
-  holdCount := holdCount + 1.
-  currentTask taskHolding: true.
-  ^currentTask link
-)
-initScheduler = (
-  queuePacketCount := holdCount := 0.
-  taskTable := Array new: 6 withAll: NoTask.
-  taskList := NoTask
-)
-initTrace = (
-  tracing := false.
-  layout := 0
-)
-queuePacket: packet = ( 
-  | t |
-  t := self findTask: packet identity.
-  NoTask == t ifTrue: [^NoTask].
-  queuePacketCount := queuePacketCount + 1.
-  packet link: NoWork.
-  packet identity: currentTaskIdentity.
-  ^t addInput: packet checkPriority: currentTask
-)
-release: identity = ( 
-  | t |
-  t := self findTask: identity.
-  NoTask == t ifTrue: [^NoTask].
-  t taskHolding: false.
-  t priority > currentTask priority
-    ifTrue: [^t]
-    ifFalse: [^currentTask]
-)
-trace: id = ( 
-  layout := layout - 1.
-  0 >= layout
-    ifTrue: 
-      [Transcript cr.
-      layout := 50].
-  Transcript show: id printString
-)
-wait = ( 
-  currentTask taskWaiting: true.
-  ^currentTask
-)'scheduling'
-schedule = (
-  currentTask := taskList. 
-  [NoTask == currentTask]
-    whileFalse: 
-      [currentTask isTaskHoldingOrWaiting
-        ifTrue: [currentTask := currentTask link]
-        ifFalse: 
-          [currentTaskIdentity := currentTask identity.
-          tracing ifTrue: [self trace: currentTaskIdentity].
-          currentTask := currentTask runTask]]
-)) : (
-| "class instance variables"  |
-'instance creation'
-bench = (
-	RichardsScheduler start
-)
-start = (
-  "RichardsBenchmark start"
-
-  super new start
+	"DBPlanner initialize"
+	DBThePlanner := DBPlanner new.
 ))
 
 'Benchmarks-DeltaBlue'
-class ScaleConstraint = BinaryConstraint (
-"I relate two variables by the linear scaling relationship: ''v2 = (v1 * scale) + offset''. Either v1 or v2 may be changed to maintain this relationship but the scale factor and offset are considered read-only.
-
-Instance variables:
-	scale		scale factor input variable <Variable>
-	offset		offset input variable <Variable>This code was derived by converting the Strongtalk version to Squeak, which is why the Sun Microsystems copyright and BSD license below applies.
-
-(c) 1995-1997 Sun Microsystems, Inc. ALL RIGHTS RESERVED.
-(c) 2012 Google Inc.
-
-Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
-
-* Redistributions of source code must retain the above copyright notice, 
- this  list of conditions and the following disclaimer.
-
-* Redistribution in binary form must reproduce the above copyright notice, 
-this list of conditions and the following disclaimer in the documentation and/o other materials provided with the distribution.
-
-Neither the name of Sun Microsystems or the names of contributors may 
-be used to endorse or promote products derived from this software without 
-specific prior written permission.
-
->>
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS 'AS IS' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, 
-THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS 
-BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE 
-GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT 
-LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH 
-DAMAGE.>>"
+class DBScaleConstraint = DBBinaryConstraint (
+"I relate two variables by the linear scaling relationship: ''v2 = (v1 * scale) + offset''. Either v1 or v2 may be changed to maintain this relationship but the scale factor and offset are considered read-only."
 | "instance variables" scale offset  |
 | "class pool variables"  |
 | "shared pool variables"  |
-'add/remove'
+'as yet unclassified'
 addToGraph = (
 	"Add myself to the constraint graph."
-
-	v1 addConstraint: self.
-	v2 addConstraint: self.
+	super addToGraph.
 	scale addConstraint: self.
 	offset addConstraint: self.
-	direction := nil.
+)
+execute = (
+	"Enforce this constraint. Assume that it is satisfied."
+	direction == DBForward
+		ifTrue: [v2 value: v1 value * scale value + offset value]
+		ifFalse: [v1 value: (v2 value - offset value) // scale value].
+)
+markInputs: mark = (
+	"Mark the inputs from the given mark."
+	super markInputs: mark.
+	scale mark: mark.
+	offset mark: mark.
 )
 removeFromGraph = (
 	"Remove myself from the constraint graph."
-
-	(v1 == nil) ifFalse: [v1 removeConstraint: self].
-	(v2 == nil) ifFalse: [v2 removeConstraint: self].
-	(scale == nil) ifFalse: [scale removeConstraint: self].
-	(offset == nil) ifFalse: [offset removeConstraint: self].
-	direction := nil.
-)'initialize-release'
-src: srcVar scale: scaleVar offset: offsetVar dst: dstVar strength: strengthSymbol = (
-	"Initialize myself with the given variables and strength."
-
-	strength := Strength of: strengthSymbol.
-	v1 := srcVar.
-	v2 := dstVar.
-	scale := scaleVar.
-	offset := offsetVar.
-	direction := nil.
-	self addConstraint.
-)'planning'
-execute = (
-	"Enforce this constraint. Assume that it is satisfied."
-
-	(direction == #forward)
-		ifTrue: [v2 value: (v1 value * scale value) + offset value]
-		ifFalse: [v1 value: (v2 value - offset value) // scale value].
+	super removeFromGraph.
+	scale isNil ifFalse: [scale removeConstraint: self].
+	offset isNil ifFalse: [offset removeConstraint: self].
 )
-inputsDo: aBlock = (
-	"Evaluate the given block on my current input variable."
+source: src scale: scalep offset: offsetp destination: dst strength: s = (
+	super var: src var: dst strength: s.
+	scale := scalep.
+	offset := offsetp.
+	self addConstraint.
+)'as-yet-unclassified'
+recalculate = (
+	"Calculate the walkabout strength, the stay flag, and, if it is 'stay', the value for the current output of this constraint. Assume this constraint is satisfied."
+	| in out |
+	in := self input. out := self output.
+	out walkStrength: (strength weakest: in walkStrength).
+	out stay: (in stay and: [scale stay and: [offset stay]]).
+	out stay ifTrue: [self execute]. "stay optimization"
+)) : (
+| "class instance variables"  |
+'as yet unclassified'
+source: src scale: scale offset: offset destination: dst strength: s = (
+	^self new source: src scale: scale offset: offset destination: dst strength: s
+))
 
-	(direction == #forward)
-		ifTrue: [aBlock value: v1; value: scale; value: offset]
-		ifFalse: [aBlock value: v2; value: scale; value: offset].
+'Benchmarks-DeltaBlue'
+class DBStayConstraint = DBUnaryConstraint (
+"I mark variables that should, with some level of preference, stay the same. I have one method with zero inputs and one output, which does nothing. Planners may exploit the fact that, if I am satisfied, my output will not change during plan execution. This is called ''stay optimization''."
+| "instance variables"  |
+| "class pool variables"  |
+| "shared pool variables"  |
+'as yet unclassified'
+execute = (
+	"Stay constraints do nothing." 
+)
+var: v strength: s = (
+	super var: v strength: s.
+	self addConstraint.
+)) : (
+| "class instance variables"  |
+)
+
+'Benchmarks-DeltaBlue'
+class DBStrength = Object (
+"Strengths are used to measure the relative importance of constraints. New strengths may be inserted in the strength hierarchy without disrupting current constraints. Strengths cannot be created outside this class, so pointer comparison can be used for value comparison."
+| "instance variables" name value  |
+| "class pool variables"  |
+| "shared pool variables"  |
+'as yet unclassified'
+name: n value: v = (
+	name := n.
+	value := v. 
+)
+strongerThan: other = (
+	^value < other value
+)
+strongest: other = (
+	^(self strongerThan: other) ifTrue: [self] ifFalse: [other]
+)
+value = (
+	^value
+)
+weakerThan: other = (
+	^value > other value
+)
+weakest: other = (
+	^(self weakerThan: other) ifTrue: [self] ifFalse: [other]
+)) : (
+| "class instance variables"  |
+'as yet unclassified'
+initialize = (
+	"DBStrength initialize"
+	DBRequired := self name: 'required' value: 0.
+	DBStrongPreferred := self name: 'strongPreferred' value: 1.
+	DBPreferred := self name: 'preferred' value: 2.
+	DBStrongDefault := self name: 'strongDefault' value: 3.
+	DBNormal := self name: 'normal' value: 4.
+	DBWeakDefault := self name: 'weakDefault' value: 5.
+	DBWeakest := self name: 'weakest' value: 6.
+
+	DBDescendingStrengths := 
+		{DBRequired.
+		DBStrongPreferred.
+		DBPreferred.
+		DBStrongDefault.
+		DBNormal.
+		DBWeakDefault.
+		DBWeakest}.
+)
+name: n value: v = (
+	^self basicNew name: n value: v
+))
+
+'Benchmarks-DeltaBlue'
+class DBUnaryConstraint = DBConstraint (
+"I am an abstract superclass for constraints having a single possible output variable."
+| "instance variables" myOutput satisfied  |
+| "class pool variables"  |
+| "shared pool variables"  |
+'as yet unclassified'
+addToGraph = (
+	"Add myself to the constraint graph."
+	myOutput addConstraint: self.
+	satisfied := false. 
+)
+chooseMethod: mark = (
+	"Decide if I can be satisfied and record that decision."
+	satisfied := (myOutput mark ~= mark and: [strength strongerThan: myOutput walkStrength])
+)
+inputsKnown: mark = (
+	^true
+)
+isSatisfied = (
+	"Answer true if this constraint is satisfied in the current solution."
+	^satisfied
+)
+markInputs: mark = (
+	"I have no inputs."
+)
+markUnsatisfied = (
+	"Record the fact that I am unsatisfied."
+	satisfied := false
+)
+output = (
+	^myOutput
 )
 recalculate = (
 	"Calculate the walkabout strength, the stay flag, and, if it is 'stay', the value for the current output of this constraint. Assume this constraint is satisfied."
-
-	| in out |
-	(direction == #forward)
-		ifTrue: [in := v1. out := v2]
-		ifFalse: [out := v1. in := v2].
-	out walkStrength: (strength weakest: in walkStrength).
-	out stay: ((in stay) and: [(scale stay) and: [offset stay]]).
-	(out stay) ifTrue: [self execute].		"stay optimization"
+	myOutput walkStrength: strength.
+	myOutput stay: self isInput not.
+	myOutput stay ifTrue: [self execute]. "Stay optimization"
+)
+removeFromGraph = (
+	"Remove myself from the constraint graph."
+	myOutput isNil ifFalse: [myOutput removeConstraint: self].
+	satisfied := false.
+)
+var: v strength: s = (
+	super strength: s.
+	myOutput := v.
+	satisfied := false.
 )) : (
 | "class instance variables"  |
-'instance creation'
-var: src var: scale var: offset var: dst strength: strengthSymbol = (
-	"Install a scale constraint with the given strength on the given variables."
-
-	^(self new) src: src scale: scale offset: offset dst: dst strength: strengthSymbol
+'as yet unclassified'
+var: v strength: s = (
+	^self new var: v strength: s
 ))
 
-'Benchmarks-Microbenchmarks'
-class SmalltalkBenchmarkRunner = Object (
-"Infrastructure to run a set of benchmarks and gather average run times.
+'Benchmarks-DeltaBlue'
+class DBVariable = Object (
+"I represent a constrained variable. In addition to my value, I maintain the structure of the constraint graph, the current dataflow graph, and various parameters of interest to the DeltaBlue incremental constraint solver."
+| "instance variables" value constraints determinedBy mark walkStrength stay name  |
+| "class pool variables"  |
+| "shared pool variables"  |
+'as yet unclassified'
+addConstraint: c = (
+	"Add the given constraint to the set of all constraints that refer to me."
+	constraints addLast: c.
+)
+constraints = (
+	^constraints
+)
+determinedBy = (
+	^determinedBy
+)
+determinedBy: c = (
+	determinedBy := c
+)
+mark = (
+	^mark
+)
+mark: m = (
+	mark := m
+)
+name: n initialValue: v = (
+	value := v.
+	constraints := OrderedCollection new: 2.
+	determinedBy := nil.
+	mark := 0.
+	walkStrength := DBWeakest.
+	stay := true.
+	name := n.
+)
+removeConstraint: c = (
+	"Remove all traces of c from this variable."
+	constraints remove: c ifAbsent: [].
+	determinedBy == c ifTrue: [determinedBy := nil]. 
+)
+stay = (
+	^stay
+)
+stay: b = (
+	stay := b
+)
+value = (
+	^value
+)
+value: v = (
+	value := v.
+)
+walkStrength = (
+	^walkStrength
+)
+walkStrength: s = (
+	walkStrength := s
+)) : (
+| "class instance variables"  |
+'as yet unclassified'
+name: n initialValue: v = (
+	^self basicNew name: n initialValue: v
+))
 
-Copyright 2012 Google Inc.
+'Benchmarks-ParserCombinators'
+class PCAlternatingParser = PCCombinatorialParser (
+""
+| "instance variables" p q  |
+| "class pool variables"  |
+| "shared pool variables"  |
+'as yet unclassified'
+compress = (
+	compressed ifTrue: [^self].
+	compressed := true.
+	p := p compress.
+	q := q compress.
+	^self
+)
+either: pArg or: qArg = (
+	compressed := false.
+	p := pArg.
+	q := qArg.
+)
+parseWithContext: ctxt ifError: onError = (
+	| pos |
+	pos := ctxt position.
+	^p parseWithContext: ctxt ifError: [ctxt position: pos. ^q parseWithContext: ctxt ifError: onError]
+)) : (
+| "class instance variables"  |
+)
+
+'Benchmarks-ParserCombinators'
+class PCCharacterRangeParser = PCCombinatorialParser (
+""
+| "instance variables" lowerBound upperBound  |
+| "class pool variables"  |
+| "shared pool variables"  |
+'as yet unclassified'
+between: c1 and: c2 = (
+	lowerBound := c1.
+	upperBound := c2.
+)
+compress = (
+	^self
+)
+parseWithContext: ctxt ifError: onError = (
+	| c |
+	ctxt atEnd ifTrue: [onError value].
+	c := ctxt next.
+	(lowerBound <= c) & (c <= upperBound) ifTrue: [^c].
+	onError value.
+)) : (
+| "class instance variables"  |
+)
+
+'Benchmarks-ParserCombinators'
+class PCCombinatorialParser = Object (
+""
+| "instance variables" compressed  |
+| "class pool variables"  |
+| "shared pool variables"  |
+'as yet unclassified'
+, p = (
+	^PCSequencingParser new subparsers: {self. p}
+)
+char: c = (
+	^PCCharacterRangeParser new between: c and: c.
+)
+charBetween: c1 and: c2 = (
+	^PCCharacterRangeParser new between: c1 and: c2.
+)
+eoi = (
+	^PCEOIParser new
+)
+parseWithContext: ctxt ifError: onError = (
+	self subclassResponsibility
+)
+star = (
+	^PCStarParser new repeat: self
+)
+wrapper: block = (
+	^PCWrappingParser new wrap: self with: block
+)
+| q = (
+	^PCAlternatingParser new either: self or: q
+)) : (
+| "class instance variables"  |
+)
+
+'Benchmarks-ParserCombinators'
+class PCEOIParser = PCCombinatorialParser (
+""
+| "instance variables"  |
+| "class pool variables"  |
+| "shared pool variables"  |
+'as yet unclassified'
+compress = (
+	^self
+)
+parseWithContext: ctxt ifError: onError = (
+	ctxt atEnd ifTrue: [^nil].
+	onError value.
+)) : (
+| "class instance variables"  |
+)
+
+'Benchmarks-ParserCombinators'
+class PCForwardReferenceParser = PCCombinatorialParser (
+""
+| "instance variables" forwardee  |
+| "class pool variables"  |
+| "shared pool variables"  |
+'as yet unclassified'
+bind: p = (
+	self assert: [forwardee isNil] message: ''.
+	forwardee := p.
+)
+compress = (
+	^forwardee compress
+)) : (
+| "class instance variables"  |
+)
+
+'Benchmarks-ParserCombinators'
+class PCParserContext = Object (
+""
+| "instance variables" content position  |
+| "class pool variables"  |
+| "shared pool variables"  |
+'as yet unclassified'
+atEnd = (
+	^position >= content size
+)
+next = (
+	position := position + 1.
+	^content at: position
+)
+over: s = (
+	content := s.
+	position := 0.
+)
+position = (
+	^position
+)
+position: v = (
+	position := v
+)) : (
+| "class instance variables"  |
+)
+
+'Benchmarks-ParserCombinators'
+class PCSequencingParser = PCCombinatorialParser (
+""
+| "instance variables" subparsers  |
+| "class pool variables"  |
+| "shared pool variables"  |
+'as yet unclassified'
+, p = (
+	^PCSequencingParser new subparsers: (subparsers copyWith: p)
+)
+compress = (
+	compressed ifTrue: [^self].
+	compressed := true.
+	subparsers := subparsers collect: [:e | e compress].
+	^self
+)
+parseWithContext: ctxt ifError: onError = (
+	^subparsers collect: [:p | p parseWithContext: ctxt ifError: onError]
+)
+subparsers: ps = (
+	compressed := false.
+	subparsers := ps.
+)
+wrapper: block = (
+	^PCWrappingParser new wrap: self with: [:results | block valueWithArguments: results]
+)) : (
+| "class instance variables"  |
+)
+
+'Benchmarks-ParserCombinators'
+class PCSimpleExpressionGrammar = PCCombinatorialParser (
+""
+| "instance variables" start exp e1 e2 parenExp number plus times digit lparen rparen  |
+| "class pool variables"  |
+| "shared pool variables"  |
+'as yet unclassified'
+initialize = (
+	start := PCForwardReferenceParser new.
+	exp := PCForwardReferenceParser new.
+	e1 := PCForwardReferenceParser new.
+	e2 := PCForwardReferenceParser new.
+	parenExp := PCForwardReferenceParser new.
+	number := PCForwardReferenceParser new.
+	plus := PCForwardReferenceParser new.
+	times := PCForwardReferenceParser new.
+	digit := PCForwardReferenceParser new.
+	lparen := PCForwardReferenceParser new.
+	rparen := PCForwardReferenceParser new.
+
+	start bind: (exp, self eoi wrapper: [:v :dollar | v]).
+	exp bind: (e1, (plus, e1) star wrapper: [:lhs :rhss | 
+		| z | z := lhs. rhss do: [:rhs | z := z + (rhs at: 2) rem: 16rFFFF]. z]).
+	e1 bind: (e2, (times, e2) star wrapper: [:lhs :rhss | 
+		| z | z := lhs. rhss do: [:rhs | z := z * (rhs at: 2) rem: 16rFFFF]. z]).
+	e2 bind: (number | parenExp).
+	
+	parenExp bind: (lparen, exp, rparen wrapper: [:lhs :e :rhs | e]).
+	number bind: (digit wrapper: [:d | d asString asNumber]).
+	
+	plus bind: (self char: $+).
+	times bind: (self char: $*).
+	digit bind: (self charBetween: $0 and: $9).
+	lparen bind: (self char: $().
+	rparen bind: (self char: $))
+)
+start = (
+	^start
+)) : (
+| "class instance variables"  |
+)
+
+'Benchmarks-ParserCombinators'
+class PCStarParser = PCCombinatorialParser (
+""
+| "instance variables" p  |
+| "class pool variables"  |
+| "shared pool variables"  |
+'as yet unclassified'
+compress = (
+	compressed ifTrue: [^self].
+	compressed := true.
+	p := p compress.
+	^self
+)
+parseWithContext: ctxt ifError: onError = (
+	| results |
+	results := OrderedCollection new.
+	[
+		| pos |
+		pos := ctxt position.
+		results add: (p parseWithContext: ctxt ifError: [ctxt position: pos. ^results]).
+	] repeat.
+)
+repeat: pArg = (
+	compressed := false.
+	p := pArg.
+)
+wrapper: block = (
+	^PCWrappingParser new wrap: self with: [:results | block valueWithArguments: results]
+)) : (
+| "class instance variables"  |
+)
+
+'Benchmarks-ParserCombinators'
+class PCWrappingParser = PCCombinatorialParser (
+""
+| "instance variables" p b  |
+| "class pool variables"  |
+| "shared pool variables"  |
+'as yet unclassified'
+compress = (
+	compressed ifTrue: [^self].
+	compressed := true.
+	p := p compress.
+	^self
+)
+parseWithContext: ctxt ifError: onError = (
+	^b value: (p parseWithContext: ctxt ifError: onError)
+)
+wrap: pArg with: bArg = (
+	compressed := false.
+	p := pArg.
+	b := bArg.
+)) : (
+| "class instance variables"  |
+)
+
+'Benchmarks-Richards'
+class RDeviceTask = RTask (
+"A task that suspends itself after each time it has been run to simulate waiting for data from an external device."
+| "instance variables" pending  |
+| "class pool variables"  |
+| "shared pool variables"  |
+'as yet unclassified'
+run: packet = (
+	packet isNil ifTrue:
+		[ | functionWork |
+		pending isNil ifTrue: [^scheduler suspendCurrent].
+		functionWork := pending.
+		pending := nil.
+		^scheduler queue: functionWork].
+	pending := packet.
+	^scheduler holdCurrent
+)) : (
+| "class instance variables"  |
+'as yet unclassified'
+on: s = (
+	^self basicNew on: s
+))
+
+'Benchmarks-Richards'
+class RHandlerTask = RTask (
+"A task that manipulates work packets and then suspends itself."
+| "instance variables" workIn deviceIn  |
+| "class pool variables"  |
+| "shared pool variables"  |
+'as yet unclassified'
+run: packet = (
+	packet isNil ifFalse:
+		[packet kind == KIND_WORK
+			ifTrue: [workIn := packet appendTo: workIn]
+			ifFalse: [deviceIn := packet appendTo: deviceIn]].
+	workIn isNil ifFalse:
+		[ | v count |
+		count := workIn datum.
+		count < DATA_SIZE
+			ifTrue:
+				[deviceIn isNil ifFalse:
+					[v := deviceIn.
+					deviceIn := deviceIn link.
+					v datum: (workIn data at: count + 1 " 1-origin conversion, sigh ").
+					workIn datum: (count + 1).
+					^scheduler queue: v]]
+			ifFalse:
+				[v := workIn.
+				workIn := workIn link.
+				^scheduler queue: v]].
+	^scheduler suspendCurrent
+)) : (
+| "class instance variables"  |
+'as yet unclassified'
+on: s = (
+	^self basicNew on: s
+))
+
+'Benchmarks-Richards'
+class RIdleTask = RTask (
+"An idle task doesn't do any work itself but cycles control between the two device tasks."
+| "instance variables" control count  |
+| "class pool variables"  |
+| "shared pool variables"  |
+'as yet unclassified'
+on: s with: ctrl with: cnt = (
+	super on: s.
+	control := ctrl.
+	count := cnt.
+)
+run: packet = (
+	count := count - 1.
+	count = 0 ifTrue: [^scheduler holdCurrent].
+	(control bitAnd: 1) = 0 ifTrue:
+		[control := control quo: 2.
+		^scheduler release: ID_DEVICE_A].
+	control := (control quo: 2) bitXor: 16rD008.
+	^scheduler release: ID_DEVICE_B
+)) : (
+| "class instance variables"  |
+'as yet unclassified'
+on: s with: ctrl with: cnt = (
+	^self basicNew on: s with: ctrl with: cnt
+))
+
+'Benchmarks-Richards'
+class RPacket = Object (
+""
+| "instance variables" link identity kind datum data  |
+| "class pool variables"  |
+| "shared pool variables"  |
+'as yet unclassified'
+appendTo: queueHead = (
+	"Add this packet to the end of a worklist, and return the worklist."
+	| peek next |
+	link := nil.
+	queueHead isNil ifTrue: [^self].
+	next := queueHead.
+	[(peek := next link) isNil]
+		whileFalse: [next := peek].
+	next link: self.
+   	^queueHead
+)
+data = (
+	^data
+)
+datum = (
+	^datum
+)
+datum: d = (
+	datum := d
+)
+identity = (
+	^identity
+)
+identity: i = (
+	identity := i
+)
+kind = (
+	^kind
+)
+link = (
+	^link
+)
+link: l = (
+	link := l
+)
+link: l identity: i kind: k = (
+	link := l.
+	identity := i.
+	kind := k.
+	datum := 0.
+	data := Array new: DATA_SIZE.
+)) : (
+| "class instance variables"  |
+'as yet unclassified'
+link: l identity: i kind: k = (
+	^self basicNew link: l identity: i kind: k
+))
+
+'Benchmarks-Richards'
+class RScheduler = Object (
+"A scheduler can be used to schedule a set of tasks based on their relative priorities.  Scheduling is done by maintaining a list of task control blocks which holds tasks and the data queue they are processing."
+| "instance variables" queueCount holdCount currentTcb currentId list blocks  |
+| "class pool variables"  |
+| "shared pool variables"  |
+'as yet unclassified'
+addDeviceTask: id priority: priority work: queue = (
+	"Add a device task to this scheduler."
+	self addTask: id priority: priority work: queue task: (RDeviceTask on: self).
+)
+addHandlerTask: id priority: priority work: queue = (
+	"Add a handler task to this scheduler."
+	self addTask: id priority: priority work: queue task: (RHandlerTask on: self).
+)
+addIdleTask: id priority: priority work: queue state: count = (
+	"Add an idle task to this scheduler."
+	self addRunningTask: id priority: priority work: queue task: (RIdleTask on: self with: 1 with: count).
+)
+addRunningTask: id priority: priority work: queue task: task = (
+	self addTask: id priority: priority work: queue task: task.
+	currentTcb setRunning.
+)
+addTask: id priority: priority work: queue task: task = (
+	currentTcb := RTaskControlBlock link: list id: id priority: priority queue: queue task: task.
+	list := currentTcb.
+	blocks at: id put: currentTcb.
+)
+addWorkerTask: id priority: priority work: queue = (
+	"Add a work task to this scheduler."
+	self addTask: id priority: priority work: queue task: (RWorkerTask on: self with: ID_HANDLER_A with: 0).
+)
+holdCount = (
+	^holdCount
+)
+holdCurrent = (
+	"Block the currently executing task and return the next task control block to run.  The blocked task will not be made runnable until it is explicitly released, even if new work is added to it."
+	holdCount := holdCount + 1.
+	currentTcb markAsHeld.
+	^currentTcb link
+)
+initialize = (
+	queueCount := 0.
+	holdCount := 0.
+	currentTcb := nil.
+	currentId := nil.
+	list := nil.
+	blocks := Array new: NUMBER_OF_IDS.
+)
+queue: packet = (
+	"Add the specified packet to the end of the worklist used by the task associated with the packet and make the task runnable if it is currently suspended."
+	| t |
+	t := blocks at: packet identity.
+	t isNil ifTrue: [^t].
+	queueCount := queueCount + 1.
+	packet link: nil.
+	packet identity: currentId.
+	^t addInput: packet checkPriority: currentTcb
+)
+queueCount = (
+	^queueCount
+)
+release: id = (
+	"Release a task that is currently blocked and return the next block to run."
+	| tcb |
+	tcb := blocks at: id.
+	tcb isNil ifTrue: [^tcb].
+	tcb markAsNotHeld.
+	tcb priority > currentTcb priority ifTrue: [^tcb].
+	^currentTcb
+)
+schedule = (
+	"Execute the tasks managed by this scheduler."
+	currentTcb := list.
+	[currentTcb isNil] whileFalse:
+		[currentTcb isHeldOrSuspended
+			ifTrue: [currentTcb := currentTcb link]
+			ifFalse: [currentId := currentTcb identity.
+					currentTcb := currentTcb run]].
+)
+suspendCurrent = (
+	"Suspend the currently executing task and return the next task control block to run. If new work is added to the suspended task it will be made runnable."
+	currentTcb markAsSuspended.
+	^currentTcb
+)) : (
+| "class instance variables"  |
+)
+
+'Benchmarks-Richards'
+class RTask = Object (
+""
+| "instance variables" scheduler  |
+| "class pool variables"  |
+| "shared pool variables"  |
+'as yet unclassified'
+on: s = (
+	scheduler := s.
+)
+run: packet = (
+	self subclassResponsibility
+)) : (
+| "class instance variables"  |
+)
+
+'Benchmarks-Richards'
+class RTaskControlBlock = Object (
+"A task control block manages a task and the queue of work packages associated with it."
+| "instance variables" link identity priority queue task state  |
+| "class pool variables"  |
+| "shared pool variables"  |
+'as yet unclassified'
+addInput: packet checkPriority: oldTask = (
+	"Adds a packet to the worklist of this block's task, marks this as runnable if necessary, and returns the next runnable object to run (the one with the highest priority."
+	queue isNil
+		ifTrue:
+			[queue := packet.
+			self markAsRunnable.
+			priority > oldTask priority ifTrue: [^self]]
+		ifFalse:
+			[queue := packet appendTo: queue].
+	^oldTask
+)
+identity = (
+	^identity
+)
+isHeldOrSuspended = (
+	^(state bitAnd: STATE_HELD) ~= 0
+		or: [state == STATE_SUSPENDED]
+)
+link = (
+	^link
+)
+link: l id: i priority: p queue: q task: t = (
+	link := l.
+	identity := i.
+	priority := p.
+	queue := q.
+	task := t.
+	state := queue isNil
+		ifTrue: [STATE_SUSPENDED]
+		ifFalse: [STATE_SUSPENDED_RUNNABLE]
+)
+markAsHeld = (
+	state := state bitOr: STATE_HELD.
+)
+markAsNotHeld = (
+	state := state bitAnd: STATE_NOT_HELD.
+)
+markAsRunnable = (
+	state := state bitOr: STATE_RUNNABLE.
+)
+markAsSuspended = (
+	state := state bitOr: STATE_SUSPENDED.
+)
+priority = (
+	^priority
+)
+run = (
+	"Runs this task, if it is ready to be run, and returns the next task to run."
+	| packet |
+	state == STATE_SUSPENDED_RUNNABLE ifTrue: [
+		packet := queue.
+		queue := packet link.
+		state := queue isNil ifTrue: [STATE_RUNNING] ifFalse: [STATE_RUNNABLE].	
+	].
+	^task run: packet
+)
+setRunning = (
+	state := STATE_RUNNING
+)) : (
+| "class instance variables"  |
+'as yet unclassified'
+link: l id: i priority: p queue: q task: t = (
+	^self basicNew link: l id: i priority: p queue: q task: t
+))
+
+'Benchmarks-Richards'
+class RWorkerTask = RTask (
+""
+| "instance variables" destination count  |
+| "class pool variables"  |
+| "shared pool variables"  |
+'as yet unclassified'
+on: s with: v1 with: v2 = (
+	super on: s.
+	destination := v1.
+	count := v2.
+)
+run: packet = (
+	packet isNil ifTrue: [^scheduler suspendCurrent].
+	destination = ID_HANDLER_A
+		ifTrue: [destination := ID_HANDLER_B]
+		ifFalse: [destination := ID_HANDLER_A].
+	packet identity: destination.
+	packet datum: 0.
+	1 to: DATA_SIZE do: [:i |
+		count := count + 1.
+		count > 26 ifTrue: [count := 1].
+		packet data at: i put: count.
+	].
+	^scheduler queue: packet
+)) : (
+| "class instance variables"  |
+'as yet unclassified'
+on: s with: v1 with: v2 = (
+	^self basicNew on: s with: v1 with: v2
+))
+
+'Benchmarks-Splay'
+class SLeaf = Object (
+""
+| "instance variables" string array  |
+| "class pool variables"  |
+| "shared pool variables"  |
+'as yet unclassified'
+withTag: tag = (
+	string := 'String for key ',tag,' in leaf node'.
+	array := {0. 1. 2. 3. 4. 5. 6. 7. 8. 9}.
+)) : (
+| "class instance variables"  |
+'as yet unclassified'
+withTag: tag = (
+	^self new withTag: tag
+))
+
+'Benchmarks-Splay'
+class SNode = Object (
+""
+| "instance variables" key value left right  |
+| "class pool variables"  |
+| "shared pool variables"  |
+'as yet unclassified'
+key = (
+	^key
+)
+key: k value: v = (
+	key := k.
+	value := v.
+)
+left = (
+	^left
+)
+left: l = (
+	left := l.
+)
+right = (
+	^right
+)
+right: r = (
+	right := r
+)
+traverse: f = ( "<[:Node]>"
+	"Performs an ordered traversal of the subtree starting here."
+	| current |
+	current := self.
+	[current == nil] whileFalse:
+		[ | left |
+		left := current left.
+		left == nil ifFalse: [left traverse: f].
+		f value: current.
+		current := current right].
+)) : (
+| "class instance variables"  |
+'as yet unclassified'
+key: k value: v = (
+	^self new key: k value: v
+))
+
+'Benchmarks-Splay'
+class SPayload = Object (
+""
+| "instance variables" left right  |
+| "class pool variables"  |
+| "shared pool variables"  |
+'as yet unclassified'
+left: l right: r = (
+	left := l.
+	right := r.
+)) : (
+| "class instance variables"  |
+'as yet unclassified'
+generate: depth with: tag = (
+	depth = 0 ifTrue: [^SLeaf withTag: tag].
+	^SPayload 
+		left: (self generate: depth - 1 with: tag)
+		right: (self generate: depth - 1 with: tag)
+)
+left: l right: r = (
+	^self new left: l right: r
+))
+
+'Benchmarks-Splay'
+class SSplayTree = Object (
+"A splay tree is a self-balancing binary search tree with the additional property that recently accessed elements are quick to access again. It performs basic operations such as insertion, look-up and removal in O(log(n)) amortized time."
+| "instance variables" root  |
+| "class pool variables"  |
+| "shared pool variables"  |
+'as yet unclassified'
+at: key = ( "<Number> ^<Node>"
+	"Returns the node having the specified [key] or null if the tree doesn't contain a node with the specified [key]."
+	
+	self isEmpty ifTrue: [^nil].
+	self splay: key.
+	^root key = key ifTrue: [root] ifFalse: [nil]
+)
+at: key "<Number>" put: value = (
+	"Inserts a node into the tree with the specified [key] and value if the tree does not already contain a node with the specified key. If the value is inserted, it becomes the root of the tree."
+	| node |
+	
+	self isEmpty ifTrue: [root := SNode key: key value: value. ^self].
+	
+	"Splay on the key to move the last node on the search path for the key to the root of the tree."
+	self splay: key.
+	
+	root key = key ifTrue: [^self].
+	node:= SNode key: key value: value.
+	key > root key
+		ifTrue: 
+			[node left: root.
+			node right: root right.
+			root right: nil]
+		ifFalse:
+			[node right: root.
+			node left: root left.
+			root left: nil].
+	root := node.
+)
+exportKeys = ( "^<List[Number]>"
+	"Returns a list with all the keys of the tree."
+	| result |
+	result := OrderedCollection new.
+	self isEmpty ifFalse: [root traverse: [:node | result add: node key]].
+	^result
+)
+findGreatestLessThan: key = ( "<Number> ^<Node>"
+	"Returns the Node having the maximum key value that is less than the specified [key]."
+	self isEmpty ifTrue: [^nil].
+	
+	"Splay on the key to move the node with the given key or the last node on the search path to the top of the tree."
+	self splay: key.
+	"Now the result is either the root node or the greatest node in the left subtree."
+	root key < key ifTrue: [^root].
+	root left == nil ifFalse: [^self findMax: root left].
+	^nil
+)
+findMax = ( "^<Node>"
+	^self findMax: root
+)
+findMax: start = ( "<Node> ^<Node>"
+	| current |
+	self isEmpty ifTrue: [^nil].
+	current := start.
+	[current right == nil] whileFalse: [current := current right].
+	^current
+)
+isEmpty = (
+	^root == nil
+)
+removeKey: key = ( "<Number> ^<Node>"
+	"Removes a node with the specified key from the tree if the tree contains a node with this key. The removed node is returned. If [key] is not found, an exception is thrown."
+	| removed |
+	
+	self isEmpty ifTrue: [self error: 'Key not found: ', key printString].
+	self splay: key.
+	root key = key ifFalse: [self error: 'Key not found: ', key printString].
+	removed := root.
+	root left == nil
+		ifTrue:
+			[root := root right]
+		ifFalse:
+			[ | right |
+			right := root right.
+			root := root left.
+			"Splay to make sure that the new root has an empty right child."
+			self splay: key.
+			"Insert the original right child as the right child of the new root."
+			root right: right].
+	^removed
+)
+splay: key = ( "<Number>"
+	"Perform the splay operation for the given key. Moves the node with the given key to the top of the tree.  If no node has the given key, the last node on the search path is moved to the top of the tree. This is the simplified top-down splaying algorithm from: ''Self-adjusting Binary Search Trees'' by Sleator and Tarjan"
+	| dummy left right current break |
+	
+	self isEmpty ifTrue: [^self].
+	dummy := SHNode key: nil value: nil.
+	left := right := dummy.
+	current := root.
+	
+	break :=
+		[left right: current left.
+		right left: current right.
+		current left: dummy right.
+		current right: dummy left.
+		root := current].
+	
+	[
+		key < current key ifTrue: [
+			current left == nil ifTrue: [^break value].
+			key < current left key ifTrue: [
+				"Rotate right"
+				| tmp |
+				tmp := current left.
+				current left: tmp right.
+				tmp right: current.
+				current := tmp.
+				current left == nil ifTrue: [^break value].
+			].
+			"Link right"
+			right left: current.
+			right := current.
+			current := current left.
+		] ifFalse: [key > current key ifTrue: [
+			current right == nil ifTrue: [^break value].
+			key > current right key ifTrue: [
+				"Rotate left"
+				| tmp |
+				tmp := current right.
+				current right: tmp left.
+				tmp left: current.
+				current := tmp.
+				current right == nil ifTrue: [^break value].
+			].
+			"Link left"
+			left right: current.
+			left := current.
+			current := current right.
+		] ifFalse: [
+			^break value
+		]].
+	] repeat.
+)) : (
+| "class instance variables"  |
+)
+
+'Benchmarks-Microbenchmarks'
+class SmalltalkClosureDefFibonacci = Benchmark (
+"A microbenchmark stressing closure creation and integer arithmetic.
+
+Copyright 2014 Google Inc.
 
 Licensed under the Apache License, Version 2.0 (the ''License''); you may not use this file except in compliance with the License.  You may obtain a copy of the License at  http://www.apache.org/licenses/LICENSE-2.0"
 | "instance variables"  |
 | "class pool variables"  |
 | "shared pool variables"  |
-) : (
-| "class instance variables"  |
 'as yet unclassified'
-benchmarks = (
-	^{
-	SmalltalkInstVarRead. 
-	SmalltalkInstVarWrite.
-	SmalltalkMethodFibonacci. 
-	SmalltalkClosureFibonacci.
-	SmalltalkNLRImmediately.
-	SmalltalkNLRInLoop.
-	RichardsScheduler. 
-	DeltaBluePlanner.
-	}
+fib: x = (
+	| f |
+	f := [:n | n < 2 ifTrue: [1] ifFalse: [(self fib: n-1) + (self fib: n-2)]].
+	^f value: x
 )
-measure: block forAtLeast: milliseconds = (
-	| runs start elapsed score |
-	runs := 0.
-	start := Time millisecondClockValue.
-	
-	[block value.
-	runs := runs + 1.
-	elapsed := Time millisecondClockValue - start.
-	elapsed < milliseconds] whileTrue.
-	
-	score := (self round: runs * 1000.0 / elapsed to: 0.1) asFloat.
-	^score printString
+run = (
+	self fib: 25
+)) : (
+| "class instance variables"  |
 )
-report = (
-	"SmalltalkBenchmarkRunner report"
-	self benchmarks do: [:benchmark |
-		| score |
-		self measure: [benchmark bench] forAtLeast: 500.
-		score:= self measure: [benchmark bench] forAtLeast: 3000.
-		(benchmark name, ': ', score) out.
-	].
-)
-round: n to: quantum = (
-	^(n // quantum) * quantum
-))
 
 'Benchmarks-Microbenchmarks'
-class SmalltalkClosureFibonacci = Object (
+class SmalltalkClosureFibonacci = Benchmark (
 "A microbenchmark stressing closure evalutation and integer arithmetic.
 
 Copyright 2012 Google Inc.
@@ -1809,56 +1598,78 @@ Licensed under the Apache License, Version 2.0 (the ''License''); you may not us
 | "instance variables"  |
 | "class pool variables"  |
 | "shared pool variables"  |
-) : (
-| "class instance variables"  |
 'as yet unclassified'
-bench = (
-	self fib25
-)
 fib25 = (
 	| fib |
 	fib := nil.
 	fib := [:n | n < 2 ifTrue: [1] ifFalse: [(fib value: n-1) + (fib value: n-2)]].
 	fib value: 25.
-))
+)
+run = (
+	self fib25
+)) : (
+| "class instance variables"  |
+)
+
+'Benchmarks-DeltaBlue'
+class SmalltalkDeltaBlue = Benchmark (
+""
+| "instance variables"  |
+| "class pool variables"  |
+| "shared pool variables"  |
+'as yet unclassified'
+run = (
+	DBThePlanner chainTest: 100.
+	DBThePlanner projectionTest: 100.
+)
+setup = (
+)) : (
+| "class instance variables"  |
+)
 
 'Benchmarks-Microbenchmarks'
-class SmalltalkInstVarRead = Object (
+class SmalltalkFieldRead = Benchmark (
 "A microbenchmark stressing reads of slots.
 
 Copyright 2012 Google Inc.
 
 Licensed under the Apache License, Version 2.0 (the ''License''); you may not use this file except in compliance with the License.  You may obtain a copy of the License at  http://www.apache.org/licenses/LICENSE-2.0"
-| "instance variables"  |
+| "instance variables" bar  |
 | "class pool variables"  |
 | "shared pool variables"  |
-) : (
-| "class instance variables" bar  |
 'as yet unclassified'
-bench = (
+run = (
 	bar := 'something'.
-	1 to: 1000000 do: [:x| bar].
-))
+	1 to: 100000 do: [:x|
+		bar. bar. bar. bar. bar.
+		bar. bar. bar. bar. bar.].
+)) : (
+| "class instance variables"  |
+)
 
 'Benchmarks-Microbenchmarks'
-class SmalltalkInstVarWrite = Object (
+class SmalltalkFieldWrite = Benchmark (
 "A microbenchmark stressing writes to slots.
 
 Copyright 2012 Google Inc.
 
 Licensed under the Apache License, Version 2.0 (the ''License''); you may not use this file except in compliance with the License.  You may obtain a copy of the License at  http://www.apache.org/licenses/LICENSE-2.0"
-| "instance variables"  |
+| "instance variables" bar  |
 | "class pool variables"  |
 | "shared pool variables"  |
-) : (
-| "class instance variables" bar  |
 'as yet unclassified'
-bench = (
-	1 to: 1000000 do: [:x| bar := 'something'].
-))
+run = (
+	| something |
+	something := 'something'.
+	1 to: 100000 do: [:x|
+		bar := something. bar := something. bar := something. bar := something. bar := something.
+		bar := something. bar := something. bar := something. bar := something. bar := something.].
+)) : (
+| "class instance variables"  |
+)
 
 'Benchmarks-Microbenchmarks'
-class SmalltalkMethodFibonacci = Object (
+class SmalltalkMethodFibonacci = Benchmark (
 "A microbenchmark stressing method invocations and integer arithmetic.
 
 Copyright 2012 Google Inc.
@@ -1867,38 +1678,18 @@ Licensed under the Apache License, Version 2.0 (the ''License''); you may not us
 | "instance variables"  |
 | "class pool variables"  |
 | "shared pool variables"  |
-) : (
-| "class instance variables"  |
 'as yet unclassified'
-bench = (
-	self fib: 25
-)
 fib: n = (
 	^n < 2 ifTrue: [1] ifFalse: [(self fib: n-1) + (self fib: n-2)]
-))
-
-'Benchmarks-Microbenchmarks'
-class SmalltalkNLRImmediately = Object (
-"A microbenchmark stressing non-local returns.
-
-Copyright 2012 Google Inc.
-
-Licensed under the Apache License, Version 2.0 (the ''License''); you may not use this file except in compliance with the License.  You may obtain a copy of the License at  http://www.apache.org/licenses/LICENSE-2.0"
-| "instance variables"  |
-| "class pool variables"  |
-| "shared pool variables"  |
-) : (
-| "class instance variables"  |
-'as yet unclassified'
-bench = (
-	1 to: 50000 do: [:ignore | self nlr].
 )
-nlr = (
-	[^2] value. ^1
-))
+run = (
+	self fib: 25
+)) : (
+| "class instance variables"  |
+)
 
 'Benchmarks-Microbenchmarks'
-class SmalltalkNLRInLoop = Object (
+class SmalltalkNLRImmediate = Benchmark (
 "A microbenchmark stressing non-local returns.
 
 Copyright 2012 Google Inc.
@@ -1907,859 +1698,234 @@ Licensed under the Apache License, Version 2.0 (the ''License''); you may not us
 | "instance variables"  |
 | "class pool variables"  |
 | "shared pool variables"  |
-) : (
-| "class instance variables" oneThroughSix  |
 'as yet unclassified'
-bench = (
+nlr = (
+	self run: [^2].
+	^1
+)
+run = (
+	1 to: 10000 do: [:i | self nlr].
+)
+run: block = (
+	block value
+)) : (
+| "class instance variables"  |
+)
+
+'Benchmarks-Microbenchmarks'
+class SmalltalkNLRLoop = Benchmark (
+"A microbenchmark stressing non-local returns.
+
+Copyright 2012 Google Inc.
+
+Licensed under the Apache License, Version 2.0 (the ''License''); you may not use this file except in compliance with the License.  You may obtain a copy of the License at  http://www.apache.org/licenses/LICENSE-2.0"
+| "instance variables" oneThroughSix  |
+| "class pool variables"  |
+| "shared pool variables"  |
+'as yet unclassified'
+nlr = (
+	oneThroughSix do: [:each | each = 4 ifTrue: [^each]].
+)
+run = (
 	oneThroughSix := {1. 2. 3. 4. 5. 6}.
-	1 to: 50000 do: [:ignore | self nlr].
+	1 to: 10000 do: [:i | self nlr].
+)) : (
+| "class instance variables" oneThroughSix  |
 )
-nlr = (
-	oneThroughSix do: [:ea | ea = 4 ifTrue: [^4]].
-))
 
-'Benchmarks-DeltaBlue'
-class StayConstraint = UnaryConstraint (
-"I mark variables that should, with some level of preference, stay the same. I have one method with zero inputs and one output, which does nothing. Planners may exploit the fact that, if I am satisfied, my output will not change during plan execution. This is called ''stay optimization.''This code was derived by converting the Strongtalk version to Squeak, which is why the Sun Microsystems copyright and BSD license below applies.
+'Benchmarks-ParserCombinators'
+class SmalltalkParserCombinators = Benchmark (
+""
+| "instance variables" seed parser theExpression  |
+| "class pool variables"  |
+| "shared pool variables"  |
+'as yet unclassified'
+nextRandom = (
+	seed := seed * 16rDEAD + 16rC0DE.
+	seed := seed bitAnd: 16rFFF.
+	^seed
+)
+randomExpression: depth = (
+	| m |
+	depth < 1 ifTrue: [^(self nextRandom rem: 10) printString].
+	m := self nextRandom rem: 3.
+	m = 0 ifTrue: [^(self randomExpression: depth-1),'+',(self randomExpression: depth-1)].
+	m = 1 ifTrue: [^(self randomExpression: depth-1),'*',(self randomExpression: depth-1)].
+	m = 2 ifTrue: [^'(',(self randomExpression: depth-1),')'].
+	self halt.
+)
+setup = (
+	seed := 16rCAFE.
+	parser := PCSimpleExpressionGrammar new start compress.
+	theExpression := self randomExpression: 20.
+	self assert: [theExpression size = 41137] message: 'Generated expression of the wrong size'.
+	self assert: [(parser parseWithContext: (PCParserContext new over: theExpression) ifError: [self parseFailed]) = 31615] message: 'Expression evaluated to wrong value'
+)'as-yet-unclassified'
+run = (
+	parser parseWithContext: (PCParserContext new over: theExpression) ifError: [self parseFailed].
+)) : (
+| "class instance variables"  |
+)
 
-(c) 1995-1997 Sun Microsystems, Inc. ALL RIGHTS RESERVED.
-(c) 2012 Google Inc.
-
-Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
-
-* Redistributions of source code must retain the above copyright notice, 
- this  list of conditions and the following disclaimer.
-
-* Redistribution in binary form must reproduce the above copyright notice, 
-this list of conditions and the following disclaimer in the documentation and/o other materials provided with the distribution.
-
-Neither the name of Sun Microsystems or the names of contributors may 
-be used to endorse or promote products derived from this software without 
-specific prior written permission.
-
->>
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS 'AS IS' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, 
-THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS 
-BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE 
-GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT 
-LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH 
-DAMAGE.>>"
+'Benchmarks-Richards'
+class SmalltalkRichards = Benchmark (
+""
 | "instance variables"  |
 | "class pool variables"  |
 | "shared pool variables"  |
-'execution'
-execute = (
-	"Stay constraints do nothing."
-)'queries'
-includeInPlan = (
-	"Stay constraints have no effect other than to control the planning process."
-
-	^false
-)) : (
-| "class instance variables"  |
-'instance creation'
-var: aVariable strength: strengthSymbol = (
-	"Install a stay constraint with the given strength on the given variable."
-
-	^(self new) var: aVariable strength: strengthSymbol
-))
-
-'Benchmarks-DeltaBlue'
-class Strength = Object (
-"Strengths are used to measure the relative importance of constraints. The hierarchy of available strengths is determined by the class variable StrengthTable (see my class initialization method). Because Strengths are invariant, references to Strength instances are shared (i.e. all references to ''Strength of: #required'' point to a single, shared instance). New strengths may be inserted in the strength hierarchy without disrupting current constraints.
-
-Instance variables:
-	symbolicValue		symbolic strength name (e.g. #required) <Symbol>
-	arithmeticValue		index of the constraint in the hierarchy, used for comparisons <Number>
-This code was derived by converting the Strongtalk version to Squeak, which is why the Sun Microsystems copyright and BSD license below applies.
-
-(c) 1995-1997 Sun Microsystems, Inc. ALL RIGHTS RESERVED.
-(c) 2012 Google Inc.
-
-Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
-
-* Redistributions of source code must retain the above copyright notice, 
- this  list of conditions and the following disclaimer.
-
-* Redistribution in binary form must reproduce the above copyright notice, 
-this list of conditions and the following disclaimer in the documentation and/o other materials provided with the distribution.
-
-Neither the name of Sun Microsystems or the names of contributors may 
-be used to endorse or promote products derived from this software without 
-specific prior written permission.
-
->>
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS 'AS IS' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, 
-THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS 
-BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE 
-GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT 
-LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH 
-DAMAGE.>>"
-| "instance variables" symbolicValue arithmeticValue  |
-| "class pool variables" AbsoluteStrongest AbsoluteWeakest Required StrengthConstants StrengthTable  |
-| "shared pool variables"  |
-'max/min'
-strongest: aStrength = (
-	"Answer the stronger of myself and aStrength."
-
-	(aStrength stronger: self)
-		ifTrue: [^aStrength]
-		ifFalse: [^self].
-)
-weakest: aStrength = (
-	"Answer the weaker of myself and aStrength."
-
-	(aStrength weaker: self)
-		ifTrue: [^aStrength]
-		ifFalse: [^self].
-)'comparing'
-sameAs: aStrength = (
-	"Answer true if I am the same strength as the given Strength."
-
-	^arithmeticValue = aStrength arithmeticValue
-)
-stronger: aStrength = (
-	"Answer true if I am stronger than the given Strength."
-
-	^arithmeticValue < aStrength arithmeticValue
-)
-weaker: aStrength = (
-	"Answer true if I am weaker than the given Strength."
-
-	^arithmeticValue > aStrength arithmeticValue
-)'printing'
-printOn: aStream = (
-	"Append a string which represents my strength onto aStream."
-
-	aStream nextPutAll: '%', symbolicValue, '%'.
-)'private'
-arithmeticValue = (
-	"Answer my arithmetic value. Used for comparisons. Note that STRONGER constraints have SMALLER arithmetic values."
-
-	^arithmeticValue
-)
-initializeWith: symVal = (
-	"Record my symbolic value and reset my arithmetic value."
-
-	symbolicValue := symVal.
-	self resetValue.
-)
-resetValue = (
-	"Lookup my symbolic value in the StrengthTable and reset my internal value."
-
-	arithmeticValue := StrengthTable at: symbolicValue.
-)) : (
-| "class instance variables"  |
-'class initialization'
+'as yet unclassified'
 initialize = (
-	"Initialize the symbolic strength table. Fix the internally caches values of all existing instances."
-	"Strength initialize"
+	DATA_SIZE := 4.
+	COUNT := 1000.
 
-	StrengthTable := Dictionary new.
-	StrengthTable at: #absoluteStrongest put: -1000.
-	StrengthTable at: #required put: 0.
-	StrengthTable at: #strongPreferred put: 1.
-	StrengthTable at: #preferred put: 2.
-	StrengthTable at: #strongDefault put: 3.
-	StrengthTable at: #default put: 4.
-	StrengthTable at: #weakDefault put: 5.
-	StrengthTable at: #absoluteWeakest put: 1000.
+	ID_IDLE := 1.
+	ID_WORKER := 2.
+	ID_HANDLER_A := 3.
+	ID_HANDLER_B := 4.
+	ID_DEVICE_A := 5.
+	ID_DEVICE_B := 6.
+	NUMBER_OF_IDS := 6.
 
-	StrengthConstants := Dictionary new.
-	StrengthTable keys do:
-		[: strengthSymbol |
-			StrengthConstants
-				at: strengthSymbol
-				put: ((super new) initializeWith: strengthSymbol)].
+	KIND_DEVICE := 0.
+	KIND_WORK := 1.
+	
+	"The task is running and is currently scheduled."
+	STATE_RUNNING := 0.
+	
+	"The task has packets left to process."
+	STATE_RUNNABLE := 1.
+	
+	"The task is not currently running. The task is not blocked as such and may be started by the scheduler."
+	STATE_SUSPENDED := 2.
+	
+	"The task is blocked and cannot be run until it is explicitly released."
+	STATE_HELD := 4.
+	STATE_SUSPENDED_RUNNABLE := STATE_SUSPENDED bitOr: STATE_RUNNABLE.
+	STATE_NOT_HELD := STATE_HELD bitInvert.
+)'as-yet-unclassified'
+run = (
+	| scheduler queue |
+	
+	scheduler := RScheduler new.
+	scheduler addIdleTask: ID_IDLE priority: 0 work: nil state: COUNT.
+	queue := RPacket link: nil identity: ID_WORKER kind: KIND_WORK.
+	queue := RPacket link: queue identity: ID_WORKER kind: KIND_WORK.
+    	scheduler addWorkerTask: ID_WORKER priority: 1000 work: queue.
 
-	"Fix arithmetic values stored in all instances."
-	"Strength allInstancesDo:
-		[: strength | strength resetValue]."
+	queue := RPacket link: nil identity: ID_DEVICE_A kind: KIND_DEVICE.
+	queue := RPacket link: queue identity: ID_DEVICE_A kind: KIND_DEVICE.
+	queue := RPacket link: queue identity: ID_DEVICE_A kind: KIND_DEVICE.
+	scheduler addHandlerTask: ID_HANDLER_A priority: 2000 work: queue.
 
-	AbsoluteStrongest := Strength of: #absoluteStrongest.
-	AbsoluteWeakest := Strength of: #absoluteWeakest.
-	Required := Strength of: #required.
-)'instance creation'
-of: aSymbol = (
-	"Answer an instance with the specified strength."
+	queue := RPacket link: nil identity: ID_DEVICE_B kind: KIND_DEVICE.
+	queue := RPacket link: queue identity: ID_DEVICE_B kind: KIND_DEVICE.
+	queue := RPacket link: queue identity: ID_DEVICE_B kind: KIND_DEVICE.
+	scheduler addHandlerTask: ID_HANDLER_B priority: 3000 work: queue.
 
-	^StrengthConstants at: aSymbol
-)'constants'
-absoluteStrongest = (
+	scheduler addDeviceTask: ID_DEVICE_A priority: 4000 work: nil.
 
-	^AbsoluteStrongest
-)
-absoluteWeakest = (
+	scheduler addDeviceTask: ID_DEVICE_B priority: 5000 work: nil.
 
-	^AbsoluteWeakest
-)
-required = (
+	scheduler schedule.
 
-	^Required
-))
-
-'Benchmarks-Richards'
-class TaskControlBlock = TaskState (
-"A TaskControlBlock is xxxxxxxxx.
-
-Instance Variables
-	function:		<Object>
-	handle:		<Object>
-	identity:		<Object>
-	input:		<Object>
-	link:		<Object>
-	priority:		<Object>
-	state:		<Object>
-
-function
-	- xxxxx
-
-handle
-	- xxxxx
-
-identity
-	- xxxxx
-
-input
-	- xxxxx
-
-link
-	- xxxxx
-
-priority
-	- xxxxx
-
-state
-	- xxxxx
-
-Copyright 2012 Google Inc.
-
-Licensed under the Apache License, Version 2.0 (the 'License'); you may not use this file except in compliance with the License.  You may obtain a copy of the License at  http://www.apache.org/licenses/LICENSE-2.0"
-| "instance variables" link identity priority input state function handle  |
-| "class pool variables"  |
-| "shared pool variables"  |
-'accessing'
-identity = (
-  ^identity
-)
-link = (
-  ^link
-)
-priority = (
-  ^priority
-)'initialize'
-link: aLink identity: anIdentity priority: aPriority initialWorkQueue: anInitialWorkQueue initialState: anInitialState function: aBlock privateData: aPrivateData = ( 
-  link := aLink.
-  identity := anIdentity.
-  priority := aPriority.
-  input := anInitialWorkQueue.
-  packetPendingIV := anInitialState isPacketPending.
-  taskWaiting := anInitialState isTaskWaiting.
-  taskHolding := anInitialState isTaskHolding.
-  function := aBlock.
-  handle := aPrivateData
-)'scheduling'
-addInput: packet checkPriority: oldTask = (
-  NoWork == input
-    ifTrue: 
-      [input := packet.
-      packetPendingIV := true.
-      priority > oldTask priority ifTrue: [^self]]
-    ifFalse: 
-      [input := self append: packet head: input].
-  ^oldTask
-)
-runTask = (
-  | message |
-  self isWaitingWithPacket
-    ifTrue: 
-      [message := input.
-      input := message link.
-      NoWork == input
-        ifTrue: [self running]
-        ifFalse: [self packetPending]]
-    ifFalse: [message := NoWork].
-  ^function value: message value: handle
-)) : (
-| "class instance variables"  |
-'instance creation'
-link: link create: identity priority: priority initialWorkQueue: initialWorkQueue initialState: initialState function: aBlock privateData: privateData = ( 
-  ^super new
-    link: link
-    identity: identity
-    priority: priority
-    initialWorkQueue: initialWorkQueue
-    initialState: initialState
-    function: aBlock
-    privateData: privateData
-))
-
-'Benchmarks-Richards'
-class TaskState = RBObject (
-"A TaskState is xxxxxxxxx.
-
-Instance Variables
-	packetPendingIV:		<Object>
-	taskHolding:		<Object>
-	taskWaiting:		<Object>
-
-packetPendingIV
-	- xxxxx
-
-taskHolding
-	- xxxxx
-
-taskWaiting
-	- xxxxx
-
-Copyright 2012 Google Inc.
-
-Licensed under the Apache License, Version 2.0 (the 'License'); you may not use this file except in compliance with the License.  You may obtain a copy of the License at  http://www.apache.org/licenses/LICENSE-2.0"
-| "instance variables" packetPendingIV taskWaiting taskHolding  |
-| "class pool variables"  |
-| "shared pool variables"  |
-'accessing'
-isPacketPending = (
-  ^packetPendingIV
-)
-isTaskHolding = (
-  ^taskHolding
-)
-isTaskWaiting = (
-  ^taskWaiting
-)
-taskHolding: aBoolean = (
-  taskHolding := aBoolean
-)
-taskWaiting: aBoolean = ( 
-  taskWaiting := aBoolean
-)'initialize'
-packetPending = (
-  packetPendingIV := true.
-  taskWaiting := false.
-  taskHolding := false
-)
-running = (
-  packetPendingIV := taskWaiting := taskHolding := false
-)
-waiting = (
-  packetPendingIV := taskHolding := false.
-  taskWaiting := true
-)
-waitingWithPacket = (
-  taskHolding := false.
-  taskWaiting := packetPendingIV := true
-)'testing'
-isRunning = (
-  ^packetPendingIV not and: [taskWaiting not and: [taskHolding not]]
-)
-isTaskHoldingOrWaiting = (
-  ^taskHolding or: [packetPendingIV not and: [taskWaiting]]
-)
-isWaiting = (
-  ^packetPendingIV not and: [taskWaiting and: [taskHolding not]]
-)
-isWaitingWithPacket = (
-  ^packetPendingIV and: [taskWaiting and: [taskHolding not]]
-)) : (
-| "class instance variables"  |
-'instance creation'
-packetPending = (
-  ^super new packetPending
-)
-running = (
-  ^super new running
-)
-waiting = (
-  ^super new waiting
-)
-waitingWithPacket = (
-  ^super new waitingWithPacket
-))
-
-'Benchmarks-DeltaBlue'
-class UnaryConstraint = AbstractConstraint (
-"I am an abstract superclass for constraints having a single possible output variable.
-
-Instance variables:
-	output		possible output variable <Variable>
-	satisfied		true if I am currently satisfied <Boolean>This code was derived by converting the Strongtalk version to Squeak, which is why the Sun Microsystems copyright and BSD license below applies.
-
-(c) 1995-1997 Sun Microsystems, Inc. ALL RIGHTS RESERVED.
-(c) 2012 Google Inc.
-
-Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
-
-* Redistributions of source code must retain the above copyright notice, 
- this  list of conditions and the following disclaimer.
-
-* Redistribution in binary form must reproduce the above copyright notice, 
-this list of conditions and the following disclaimer in the documentation and/o other materials provided with the distribution.
-
-Neither the name of Sun Microsystems or the names of contributors may 
-be used to endorse or promote products derived from this software without 
-specific prior written permission.
-
->>
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS 'AS IS' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, 
-THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS 
-BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE 
-GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT 
-LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH 
-DAMAGE.>>"
-| "instance variables" output satisfied  |
-| "class pool variables"  |
-| "shared pool variables"  |
-'add/remove'
-addToGraph = (
-	"Add myself to the constraint graph."
-
-	output addConstraint: self.
-	satisfied := false.
-)
-removeFromGraph = (
-	"Remove myself from the constraint graph."
-
-	(output == nil) ifFalse: [output removeConstraint: self].
-	satisfied := false.
-)'initialize-release'
-var: aVariable strength: strengthSymbol = (
-	"Initialize myself with the given variable and strength."
-
-	strength := Strength of: strengthSymbol.
-	output := aVariable.
-	satisfied := false.
-	self addConstraint.
-)'planning'
-chooseMethod: mark = (
-	"Decide if I can be satisfied and record that decision."
-
-	satisfied :=
-		(output mark ~= mark) and:
-		[strength stronger: output walkStrength].
-)
-execute = (
-	"Enforce this constraint. Assume that it is satisfied."
-
-	self subclassResponsibility
-)
-inputsDo: aBlock = (
-	"I have no input variables."
-)
-markUnsatisfied = (
-	"Record the fact that I am unsatisfied."
-
-	satisfied := false.
-)
-output = (
-	"Answer my current output variable."
-
-	^output
-)
-recalculate = (
-	"Calculate the walkabout strength, the stay flag, and, if it is 'stay', the value for the current output of this constraint. Assume this constraint is satisfied."
-
-	output walkStrength: strength.
-	output stay: (self isInput not).
-	(output stay) ifTrue: [self execute].	"stay optimization"
-)'queries'
-isSatisfied = (
-	"Answer true if this constraint is satisfied in the current solution."
-
-	^satisfied
+	scheduler queueCount = 2322
+		ifFalse: [Error signal: 'bad scheduler queue-count'].
+	scheduler holdCount = 928
+		ifFalse: [Error signal: 'bad scheduler hold-count'].
 )) : (
 | "class instance variables"  |
 )
 
-'Benchmarks-DeltaBlue'
-class Variable = Object (
-"I represent a constrained variable. In addition to my value, I maintain the structure of the constraint graph, the current dataflow graph, and various parameters of interest to the DeltaBlue incremental constraint solver.
+'Benchmarks-Microbenchmarks'
+class SmalltalkSlotRead = Benchmark (
+"A microbenchmark stressing reads of slots.
 
-Instance variables:
-	value			my value; changed by constraints, read by client <Object>
-	constraints		normal constraints that reference me <Array of Constraint>
-	determinedBy	the constraint that currently determines
-					my value (or nil if there isn't one) <Constraint>
-	walkStrength		my walkabout strength <Strength>
-	stay			true if I am a planning-time constant <Boolean>
-	mark			used by the planner to mark constraints <Number>This code was derived by converting the Strongtalk version to Squeak, which is why the Sun Microsystems copyright and BSD license below applies.
+Copyright 2014 Google Inc.
 
-(c) 1995-1997 Sun Microsystems, Inc. ALL RIGHTS RESERVED.
-(c) 2012 Google Inc.
-
-Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
-
-* Redistributions of source code must retain the above copyright notice, 
- this  list of conditions and the following disclaimer.
-
-* Redistribution in binary form must reproduce the above copyright notice, 
-this list of conditions and the following disclaimer in the documentation and/o other materials provided with the distribution.
-
-Neither the name of Sun Microsystems or the names of contributors may 
-be used to endorse or promote products derived from this software without 
-specific prior written permission.
-
->>
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS 'AS IS' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, 
-THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS 
-BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE 
-GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT 
-LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH 
-DAMAGE.>>"
-| "instance variables" value constraints determinedBy walkStrength stay mark  |
+Licensed under the Apache License, Version 2.0 (the ''License''); you may not use this file except in compliance with the License.  You may obtain a copy of the License at  http://www.apache.org/licenses/LICENSE-2.0"
+| "instance variables" bar  |
 | "class pool variables"  |
 | "shared pool variables"  |
-'equality constraints'
-requireEquals: aVariable = (
-	"Install a required equality constraint between me and the given variable."
+'as yet unclassified'
+bar = (
+	^bar
+)
+bar: v = (
+	bar := v
+)
+run = (
+	self bar: 'something'.
+	1 to: 100000 do: [:x|
+		self bar. self bar. self bar. self bar. self bar.
+		self bar. self bar. self bar. self bar. self bar.].
+)) : (
+| "class instance variables"  |
+)
 
-	^EqualityConstraint var: self var: aVariable strength: #required
-)'initialize-release'
+'Benchmarks-Microbenchmarks'
+class SmalltalkSlotWrite = Benchmark (
+"A microbenchmark stressing writes to slots.
+
+Copyright 2014 Google Inc.
+
+Licensed under the Apache License, Version 2.0 (the ''License''); you may not use this file except in compliance with the License.  You may obtain a copy of the License at  http://www.apache.org/licenses/LICENSE-2.0"
+| "instance variables" bar  |
+| "class pool variables"  |
+| "shared pool variables"  |
+'as yet unclassified'
+bar = (
+	^bar
+)
+bar: v = (
+	bar := v
+)
+run = (
+	| something |
+	something := 'something'.
+	1 to: 100000 do: [:x |
+		self bar: something. self bar: something. self bar: something. self bar: something. self bar: something.
+		self bar: something. self bar: something. self bar: something. self bar: something. self bar: something.].
+)) : (
+| "class instance variables"  |
+)
+
+'Benchmarks-Splay'
+class SmalltalkSplay = Benchmark (
+""
+| "instance variables" tree random  |
+| "class pool variables" TreeModifications TreePayloadDepth TreeSize  |
+| "shared pool variables"  |
+'as yet unclassified'
+insertNewNode = ( "^<Number>"
+	| key payload |
+	[key := random next.
+	(tree at: key) == nil] whileFalse.
+	payload := SPayload generate: TreePayloadDepth with: key printString.
+	tree at: key put: payload.
+	^key
+)
+run = (
+	"Replace a few nodes in the splay tree."
+	TreeModifications timesRepeat: 
+		[ | key greatest |
+		key := self insertNewNode. 
+		greatest := tree findGreatestLessThan: key.
+		greatest == nil 
+			ifTrue: [tree removeKey: key]
+			ifFalse: [tree removeKey: greatest key]].
+)
+setup = (
+	tree := SSplayTree new.
+	random := Random new.
+	TreeSize timesRepeat: [self insertNewNode].
+)) : (
+| "class instance variables"  |
+'as yet unclassified'
 initialize = (
-
-	value := 0.
-	constraints := OrderedCollection new: 2.
-	determinedBy := nil.
-	walkStrength := Strength absoluteWeakest.
-	stay := true.
-	mark := 0.
-)'stay constraints'
-defaultStay = (
-
-	^StayConstraint var: self strength: #default
-)
-preferredStay = (
-
-	^StayConstraint var: self strength: #preferred
-)
-requiredStay = (
-
-	^StayConstraint var: self strength: #required
-)
-strongDefaultStay = (
-
-	^StayConstraint var: self strength: #strongDefault
-)
-strongPreferredStay = (
-
-	^StayConstraint var: self strength: #strongPreferred
-)
-weakDefaultStay = (
-
-	^StayConstraint var: self strength: #weakDefault
-)'access'
-addConstraint: aConstraint = (
-	"Add the given constraint to the set of all constraints that refer to me."
-
-	constraints add: aConstraint.
-)
-constraints = (
-	"Answer the set of constraints that refer to me."
-
-	^constraints
-)
-determinedBy = (
-	"Answer the constraint that determines my value in the current dataflow."
-
-	^determinedBy
-)
-determinedBy: aConstraint = (
-	"Record that the given constraint determines my value in the current data flow."
-
-	determinedBy := aConstraint.
-)
-mark = (
-	"Answer my mark value."
-
-	^mark
-)
-mark: markValue = (
-	"Set my mark value."
-
-	mark := markValue.
-)
-removeConstraint: c = (
-	"Remove all traces of c from this variable."
-
-	constraints remove: c ifAbsent: [].
-	(determinedBy == c) ifTrue: [determinedBy := nil].
-)
-stay = (
-	"Answer my stay flag."
-
-	^stay
-)
-stay: aBoolean = (
-	"Set my stay flag."
-
-	stay := aBoolean
-)
-value = (
-	"Answer my value."
-
-	^value
-)
-value: anObject = (
-	"Set my value."
-
-	value := anObject.
-)
-walkStrength = (
-	"Answer my walkabout strength in the current dataflow."
-
-	^walkStrength
-)
-walkStrength: aStrength = (
-	"Set my walkabout strength in the current dataflow."
-
-	walkStrength := aStrength.
-)'changes'
-changeIn: aBlock strength: strengthSymbol = (
-	"Attempt to add an edit constraint of the given strength to myself and execute the given block only if this constraint can be satisfied (i.e. no stronger constraint prevents me from changing)."
-
-	| editConstraint |
-	editConstraint := EditConstraint var: self strength: strengthSymbol.
-	(editConstraint isSatisfied) ifTrue:
-		[aBlock value.
-		 DeltaBluePlanner propagateFrom: self].
-	editConstraint destroyConstraint.
-)
-setAll: variables to: values strength: strengthSymbol = (
-	"Attempt to assign the given values to the given variables using the given strength. This is an all-or-nothing operation; if any variable cannot be changed due to a stronger constraint then no variable is changed."
-
-	| allSatisfied editConstraints editConstraint |
-	(variables size = values size) ifFalse:
-		[^self error: 'variable and value lists must be same size'].
-
-	"add edit constraints"
-	allSatisfied := true.		"true iff all edit constraints are satisfied"
-	editConstraints := variables collect:
-		[: v |
-		 editConstraint := EditConstraint var: v strength: strengthSymbol.
-		 (editConstraint isSatisfied) ifFalse: [allSatisfied := false].
-		 editConstraint].
-
-	(allSatisfied) ifTrue:
-		["do the assignments only if all edit constraints are satisfied"
-		 variables with: values do:
-			[: thisVar : thisValue |
-			 thisVar value: thisValue.
-			 DeltaBluePlanner propagateFrom: thisVar]].
-
-	"remove edit constraints"
-	editConstraints do: [: c | c destroyConstraint].
-)
-setValue: aValue = (
-	"Attempt to assign the given value to me using a strength of #preferred."
-
-	self setValue: aValue strength: #preferred.
-)
-setValue: aValue strength: strengthSymbol = (
-	"Attempt to assign the given value to me using the given strength."
-
-	| editConstraint |
-	editConstraint := EditConstraint var: self strength: strengthSymbol.
-	(editConstraint isSatisfied) ifTrue:
-		[self value: aValue.
-		 DeltaBluePlanner propagateFrom: self].
-	editConstraint destroyConstraint.
-)'printing'
-longPrintOn: aStream = (
-
-	self shortPrintOn: aStream.
-	aStream nextPutAll: '   Constraints: '.
-	(constraints isEmpty)
-		ifTrue: [aStream cr; tab; nextPutAll: 'none']
-		ifFalse:
-			[constraints do:
-				[: c | aStream cr; tab. c shortPrintOn: aStream]].
-	(determinedBy isNil) ifFalse:
-		[aStream cr; nextPutAll: '   Determined by: '.
-		 aStream cr; tab. determinedBy shortPrintOn: aStream].
-	aStream cr.
-)
-printOn: aStream = (
-
-	(Sensor leftShiftDown)
-		ifTrue: [self longPrintOn: aStream]
-		ifFalse: [self shortPrintOn: aStream].
-)
-shortPrintOn: aStream = (
-
-	aStream nextPutAll: 'V(', self asOop printString, ', '.
-	aStream nextPutAll: walkStrength printString, ', '.
-	(stay isNil) ifFalse:
-		[aStream nextPutAll: (stay ifTrue: ['stay, '] ifFalse: ['changing, '])].
-	aStream nextPutAll: value printString.
-	aStream nextPutAll: ')'.
-	aStream cr.
-)) : (
-| "class instance variables"  |
-'instance creation'
-new = (
-
-	^super new initialize
-)
-value: aValue = (
-
-	^(super new) initialize; value: aValue
-))
-
-'Benchmarks-Richards'
-class WorkerTaskDataRecord = RBObject (
-"A WorkerTaskDataRecord is xxxxxxxxx.
-
-Instance Variables
-	count:		<Object>
-	destination:		<Object>
-
-count
-	- xxxxx
-
-destination
-	- xxxxx
-
-Copyright 2012 Google Inc.
-
-Licensed under the Apache License, Version 2.0 (the 'License'); you may not use this file except in compliance with the License.  You may obtain a copy of the License at  http://www.apache.org/licenses/LICENSE-2.0"
-| "instance variables" destination count  |
-| "class pool variables"  |
-| "shared pool variables"  |
-'accessing'
-count = (
-  ^count
-)
-count: aCount = (
-  count := aCount
-)
-destination = (
-  ^destination
-)
-destination: aHandler = (
-  destination := aHandler
-)'initialize'
-create = (
-  destination := HandlerA.
-  count := 0
-)) : (
-| "class instance variables"  |
-'instance creation'
-create = (
-  ^super new create
-))
-
-'Benchmarks-DeltaBlue'
-class XMouseConstraint = UnaryConstraint (
-"I am a unary input constraint that constrains a variable to the current x-coordinate of the mouse. I contain an offset to normalize the coordinate system to one convenient for the target variable.
-
-Instance variables:
-	xOffset		constant x-offset <Number>This code was derived by converting the Strongtalk version to Squeak, which is why the Sun Microsystems copyright and BSD license below applies.
-
-(c) 1995-1997 Sun Microsystems, Inc. ALL RIGHTS RESERVED.
-(c) 2012 Google Inc.
-
-Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
-
-* Redistributions of source code must retain the above copyright notice, 
- this  list of conditions and the following disclaimer.
-
-* Redistribution in binary form must reproduce the above copyright notice, 
-this list of conditions and the following disclaimer in the documentation and/o other materials provided with the distribution.
-
-Neither the name of Sun Microsystems or the names of contributors may 
-be used to endorse or promote products derived from this software without 
-specific prior written permission.
-
->>
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS 'AS IS' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, 
-THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS 
-BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE 
-GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT 
-LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH 
-DAMAGE.>>"
-| "instance variables" xOffset  |
-| "class pool variables"  |
-| "shared pool variables"  |
-'initialize-release'
-var: aVariable offset: aNumber strength: strengthSymbol = (
-	"Install myself with the given variable, x-offset, and strength."
-
-	xOffset := aNumber.
-	self var: aVariable strength: strengthSymbol.
-)'execution'
-execute = (
-	"Enforce this constraint. Assume that it is satisfied."
-
-	output value: (Sensor mousePoint x + xOffset).
-)'queries'
-isInput = (
-	"I depend on the state of the mouse."
-
-	^true
-)) : (
-| "class instance variables"  |
-'instance creation'
-var: aVariable offset: xOffset strength: strengthSymbol = (
-	"Install an XMouse constraint on the given variable with the given offset constant to be added to the raw mouse position."
-
-	^(self new) var: aVariable offset: xOffset strength: strengthSymbol
-))
-
-'Benchmarks-DeltaBlue'
-class YMouseConstraint = UnaryConstraint (
-"I am a unary input constraint that constrains a variable to the current y-coordinate of the mouse. I contain an offset to normalize the coordinate system to one convenient for the target variable.
-
-Instance variables:
-	yOffset		constant y-offset <Number>This code was derived by converting the Strongtalk version to Squeak, which is why the Sun Microsystems copyright and BSD license below applies.
-
-(c) 1995-1997 Sun Microsystems, Inc. ALL RIGHTS RESERVED.
-(c) 2012 Google Inc.
-
-Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
-
-* Redistributions of source code must retain the above copyright notice, 
- this  list of conditions and the following disclaimer.
-
-* Redistribution in binary form must reproduce the above copyright notice, 
-this list of conditions and the following disclaimer in the documentation and/o other materials provided with the distribution.
-
-Neither the name of Sun Microsystems or the names of contributors may 
-be used to endorse or promote products derived from this software without 
-specific prior written permission.
-
->>
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS 'AS IS' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, 
-THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS 
-BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE 
-GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT 
-LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH 
-DAMAGE.>>"
-| "instance variables" yOffset  |
-| "class pool variables"  |
-| "shared pool variables"  |
-'initialize-release'
-var: aVariable offset: aNumber strength: strengthSymbol = (
-	"Install myself with the given variable, y-offset, and strength."
-
-	yOffset := aNumber.
-	self var: aVariable strength: strengthSymbol.
-)'execution'
-execute = (
-	"Enforce this constraint. Assume that it is satisfied."
-
-	output value: (Sensor mousePoint y + yOffset).
-)'queries'
-isInput = (
-	"I depend on the state of the mouse."
-
-	^true
-)) : (
-| "class instance variables"  |
-'instance creation'
-var: aVariable offset: yOffset strength: strengthSymbol = (
-	"Install a YMouse constraint on the given variable with the given offset constant to be added to the raw mouse position."
-
-	^(self new) var: aVariable offset: yOffset strength: strengthSymbol
+	"SSplay initialize"
+	TreeSize := 8000.
+	TreeModifications := 80.
+	TreePayloadDepth := 5.
 ))
 
 )
