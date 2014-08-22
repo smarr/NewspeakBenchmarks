@@ -1,15 +1,17 @@
 Newspeak3
 'Benchmarks'
-class NonlocalReturnImmediately usingPlatform: p = (
-(*A microbenchmark stressing non-local returns.
+class ClosureDefFibonacci usingPlatform: p = (
+(*A microbenchmark stressing closure allocation, closure evaluation and integer arithmetic.
 
 Copyright 2012 Google Inc.
 
 Licensed under the Apache License, Version 2.0 (the ''License''); you may not use this file except in compliance with the License.  You may obtain a copy of the License at  http://www.apache.org/licenses/LICENSE-2.0*))
 ('as yet unclassified'
 bench = (
-	50000 timesRepeat: [self nlr].
+	self fib: 25.
 )
-nlr = (
-	[^2] value. ^1
+fib: x = (
+	| f |
+	f:: [:n | n < 2 ifTrue: [1] ifFalse: [(self fib: n-1) + (self fib: n-2)]].
+	^f value: x
 )) : ()

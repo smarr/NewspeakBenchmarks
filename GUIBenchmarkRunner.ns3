@@ -8,17 +8,18 @@ Copyright 2013 Ryan Macnak
 
 Licensed under the Apache License, Version 2.0 (the ''License''); you may not use this file except in compliance with the License.  You may obtain a copy of the License at  http://www.apache.org/licenses/LICENSE-2.0*)|
 	benchmarks = {
-		ns InstVarRead.
-		ns InstVarWrite.
-		ns MethodFibonacci.
+		ns ClosureDefFibonacci.
 		ns ClosureFibonacci.
-		ns NonlocalReturnImmediately.
-		ns NonlocalReturnInLoop.
-		ns Richards.
 		ns DeltaBlue.
-		ns DeltaBlueOpt.
+		ns MethodFibonacci.
+		ns NLRImmediate.
+		ns NLRLoop.
 		ns ParserCombinators.
-		 		ns Splay.
+		ns Richards.		
+		ns SlotRead.
+		ns SlotWrite.
+		ns Splay.
+		ns SplayHarder.
 	}.
 |)
 (
@@ -29,6 +30,7 @@ Subject = p hopscotch core Subject.
 Presenter = p hopscotch core Presenter.
 HopscotchWindow = p hopscotch core HopscotchWindow.
 cachedPlatform = p.
+Smalltalk = [p squeak Smalltalk] on: Error do: [:e | nil].
 |)
 (
 class BenchmarkPresenter onSubject: s = Presenter onSubject: s ()
@@ -39,6 +41,7 @@ definition = (
 			| b score |	
 			b:: benchmark usingPlatform: cachedPlatform.
 			measure: [b bench] forAtLeast: 300.
+			[Smalltalk garbageCollect] on: Error do: [:e | e].
 			score:: measure: [b bench] forAtLeast: 2000.
 			label: benchmark name, ': ', score
 		]

@@ -8,17 +8,18 @@ Copyright 2013 Ryan Macnak
 
 Licensed under the Apache License, Version 2.0 (the ''License''); you may not use this file except in compliance with the License.  You may obtain a copy of the License at  http://www.apache.org/licenses/LICENSE-2.0*)|
 	benchmarks = {
-		ns InstVarRead.
-		ns InstVarWrite.
-		ns MethodFibonacci.
+		ns ClosureDefFibonacci.
 		ns ClosureFibonacci.
-		ns NonlocalReturnImmediately.
-		ns NonlocalReturnInLoop.
-		ns Splay.
-		ns Richards.
 		ns DeltaBlue.
-		ns DeltaBlueOpt.
+		ns MethodFibonacci.
+		ns NLRImmediate.
+		ns NLRLoop.
 		ns ParserCombinators.
+		ns Richards.		
+		ns SlotRead.
+		ns SlotWrite.
+		ns Splay.
+		ns SplayHarder.
 	}.
 |)
 (
@@ -50,6 +51,7 @@ report = (
 		score:: measure: [b bench] forAtLeast: 2000.
 		(benchmark name, ': ', score) out.
 	].
+
 )
 round: n to: quantum = (
 	^(n // quantum) * quantum
