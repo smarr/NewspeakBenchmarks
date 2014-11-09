@@ -2,7 +2,7 @@ Newspeak3
 'Benchmarks'
 class SlotWrite usingPlatform: p = (| slot |)
 ('as yet unclassified'
-bench = (
+public bench = (
 	| something = 'something'. |
 	1 to: 100000 do: [:i |
 		slot: something. slot: something. slot: something. slot: something. slot: something.

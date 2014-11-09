@@ -2,22 +2,22 @@ Newspeak3
 'Benchmarks'
 class DeltaBlue usingPlatform: p = (
 (* One-way constraint solver, originally written in Smalltalk by John Maloney and Mario Wolczko. *)|
-List = p collections OrderedCollection.
+private List = p collections OrderedCollection.
 
-required = Strength name: 'required' value: 0.
-strongPreferred = Strength name: 'strongPreferred' value: 1.
-preferred = Strength name: 'preferred' value: 2.
-strongDefault = Strength name: 'strongDefault' value: 3.
-normal = Strength name: 'normal' value: 4.
-weakDefault = Strength name: 'weakDefault' value: 5.
-weakest = Strength name: 'weakest' value: 6.
+private required = Strength name: 'required' value: 0.
+private strongPreferred = Strength name: 'strongPreferred' value: 1.
+private preferred = Strength name: 'preferred' value: 2.
+private strongDefault = Strength name: 'strongDefault' value: 3.
+private normal = Strength name: 'normal' value: 4.
+private weakDefault = Strength name: 'weakDefault' value: 5.
+private weakest = Strength name: 'weakest' value: 6.
 
-descendingStrengths = {required. strongPreferred. preferred. strongDefault. normal. weakDefault. weakest}.
+private descendingStrengths = {required. strongPreferred. preferred. strongDefault. normal. weakDefault. weakest}.
 
-forward = Direction named: 'forward'.
-backward = Direction named: 'backward'.
+private forward = Direction named: 'forward'.
+private backward = Direction named: 'backward'.
 
-planner = Planner new.
+private planner = Planner new.
 |)
 (
 class Direction named: n = (|
@@ -479,8 +479,8 @@ public setValueOf: var <Variable> to: newValue = (
 )) : ()
 class Strength name: n value: v = (
 (* Strengths are used to measure the relative importance of constraints. New strengths may be inserted in the strength hierarchy without disrupting current constraints. Strengths cannot be created outside this class, so pointer comparison can be used for value comparison. *)|
-name <String> = n.
-value <Integer> = v.
+public name <String> = n.
+public value <Integer> = v.
 |)
 ('as yet unclassified'
 public strongerThan: other <Strength> ^<Boolean> = (

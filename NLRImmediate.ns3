@@ -2,7 +2,7 @@ Newspeak3
 'Benchmarks'
 class NLRImmediate usingPlatform: p = ()
 ('as yet unclassified'
-bench = (
+public bench = (
 	1 to: 10000 do: [:i | self nlr].
 )
 nlr = (

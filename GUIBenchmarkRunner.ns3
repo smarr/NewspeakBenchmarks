@@ -19,18 +19,17 @@ Licensed under the Apache License, Version 2.0 (the ''License''); you may not us
 		ns SlotRead.
 		ns SlotWrite.
 		ns Splay.
-		ns SplayHarder.
 	}.
 |)
 (
 class Benchmarking usingPlatform: p = (|
-Time = p time Time.
-List = p collections OrderedCollection.
-Subject = p hopscotch core Subject.
-Presenter = p hopscotch core Presenter.
-HopscotchWindow = p hopscotch core HopscotchWindow.
-cachedPlatform = p.
-Smalltalk = [p squeak Smalltalk] on: Error do: [:e | nil].
+private Time = p time Time.
+private List = p collections OrderedCollection.
+private Subject = p hopscotch core Subject.
+private Presenter = p hopscotch core Presenter.
+private HopscotchWindow = p hopscotch core HopscotchWindow.
+private cachedPlatform = p.
+private Smalltalk = [p squeak Smalltalk] on: Error do: [:e | nil].
 |)
 (
 class BenchmarkPresenter onSubject: s = Presenter onSubject: s ()
@@ -52,7 +51,7 @@ class BenchmarkSubject = Subject onModel: nil ()
 createPresenter = (
 	^BenchmarkPresenter onSubject: self
 )
-title = (
+public title = (
 	^'Newspeak Benchmarks'
 )) : ()'as yet unclassified'
 measure: block forAtLeast: milliseconds = (
@@ -68,12 +67,12 @@ measure: block forAtLeast: milliseconds = (
 	score:: (round: runs * 1000.0 / elapsed to: 0.1) asFloat.
 	^score printString
 )
-report = (
+public report = (
 	HopscotchWindow openSubject: BenchmarkSubject new.
 )
 round: n to: quantum = (
 	^(n // quantum) * quantum
 )) : ()'as yet unclassified'
-main: p args: argv = (
+public main: p args: argv = (
 	(Benchmarking usingPlatform: p) report
 )) : ()

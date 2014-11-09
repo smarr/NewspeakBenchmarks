@@ -22,10 +22,10 @@ class Leaf withTag: tag = (|
 |)
 () : ()
 class Node key: k value: v = (|
-key = k.
-value = v.
-left
-right
+public key = k.
+public value = v.
+public left
+public right
 |)
 ('as yet unclassified'
 traverse: f <[:Node]> = (
@@ -42,7 +42,7 @@ class Payload left: l right: r = (|
 	right ::= r.
 |)
 () : ('as yet unclassified'
-generate: depth with: tag = (
+public generate: depth with: tag = (
 	depth = 0 ifTrue: [^Leaf withTag: tag].
 	^Payload 
 		left: (generate: depth - 1 with: tag)
@@ -53,14 +53,14 @@ class SplayTree = (
 root <Node>
 |)
 ('as yet unclassified'
-at: key <Number> ^<Node> = (
+public at: key <Number> ^<Node> = (
 	(*Returns the node having the specified [key] or null if the tree doesn't contain a node with the specified [key].*)
 	
 	isEmpty ifTrue: [^nil].
 	splay: key.
 	^root key = key ifTrue: [root] ifFalse: [nil]
 )
-at: key <Number> put: value = (
+public at: key <Number> put: value = (
 	(*Inserts a node into the tree with the specified [key] and value if the tree does not already contain a node with the specified key. If the value is inserted, it becomes the root of the tree.*)
 	| node |
 	
@@ -82,13 +82,13 @@ at: key <Number> put: value = (
 			root left: nil].
 	root:: node.
 )
-exportKeys ^<List[Number]> = (
-	(*Returns a list with all the keys of the tree.*)
+public exportKeys ^<List[Number]> = (
+	(* Returns a list with all the keys of the tree. *)
 	| result = OrderedCollection new. |
 	isEmpty ifFalse: [root traverse: [:node | result add: node key]].
 	^result
 )
-findGreatestLessThan: key <Number> ^<Node> = (
+public findGreatestLessThan: key <Number> ^<Node> = (
 	(*Returns the Node having the maximum key value that is less than the specified [key].*)
 	isEmpty ifTrue: [^nil].
 	
@@ -112,7 +112,7 @@ findMax: start <Node> ^<Node> = (
 isEmpty = (
 	^root == nil
 )
-removeKey: key <Number> ^<Node> = (
+public removeKey: key <Number> ^<Node> = (
 	(*Removes a node with the specified key from the tree if the tree contains a node with this key. The removed node is returned. If [key] is not found, an exception is thrown.*)
 	| removed |
 	
@@ -182,7 +182,7 @@ splay: key <Number> = (
 		]].
 	] repeat.
 )) : ()'as yet unclassified'
-bench = (
+public bench = (
 	exercise.
 )
 exercise = (

@@ -112,8 +112,8 @@ public appendTo: queueHead <Packet> ^<Packet> = (
 )) : ()
 class Scheduler = (
 (* A scheduler can be used to schedule a set of tasks based on their relative priorities.  Scheduling is done by maintaining a list of task control blocks which holds tasks and the data queue they are processing. *)|
-	queueCount <Integer> ::= 0.
-	holdCount <Integer> ::= 0.
+	public queueCount <Integer> ::= 0.
+	public holdCount <Integer> ::= 0.
 	currentTcb <TaskControlBlock>
 	currentId
 	list <TaskControlBlock>
@@ -192,9 +192,9 @@ public run: packet <Packet> = (
 )) : ()
 class TaskControlBlock link: l id: i priority: p queue: q task: t = (
 (* A task control block manages a task and the queue of work packages associated with it. *)|
-	link <TaskControlBlock> = l.
-	identity <Integer> = i.
-	priority <Integer> = p.
+	public link <TaskControlBlock> = l.
+	public identity <Integer> = i.
+	public priority <Integer> = p.
 	queue <Packet> ::= q.
 	task <Task> = t.
 	state <Integer> ::= queue isNil ifTrue: [STATE_SUSPENDED] ifFalse: [STATE_SUSPENDED_RUNNABLE].

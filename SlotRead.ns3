@@ -2,7 +2,7 @@ Newspeak3
 'Benchmarks'
 class SlotRead usingPlatform: p = (| slot |)
 ('as yet unclassified'
-bench = (
+public bench = (
 	self slot: 'something'.
 	1 to: 100000 do: [:i |
 		slot. slot. slot. slot. slot.

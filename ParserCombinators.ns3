@@ -25,14 +25,14 @@ p ::= p.
 q ::= q.
 |)
 ('as yet unclassified'
-compress = (
+public compress = (
 	compressed ifTrue: [^self].
 	compressed: true.
 	p:: p compress.
 	q:: q compress.
 	^self
 )
-parseWithContext: ctxt ifError: onError = (
+public parseWithContext: ctxt ifError: onError = (
 	| pos = ctxt position. |
 	^p parseWithContext: ctxt ifError: [ctxt position: pos. ^q parseWithContext: ctxt ifError: onError]
 )) : ()
@@ -41,10 +41,10 @@ lowerBound = c1.
 upperBound = c2.
 |)
 ('as yet unclassified'
-compress = (
+public compress = (
 	^self
 )
-parseWithContext: ctxt ifError: onError = (
+public parseWithContext: ctxt ifError: onError = (
 	| c |
 	ctxt atEnd ifTrue: [onError value].
 	c:: ctxt next.
@@ -55,36 +55,36 @@ class CombinatorialParser = (|
 compressed ::= false.
 |)
 ('as yet unclassified'
-, p = (
+public , p = (
 	^SequencingParser subparsers: {self. p}
 )
-char: c = (
+public char: c = (
 	^CharacterRangeParser between: c and: c.
 )
-charBetween: c1 and: c2 = (
+public charBetween: c1 and: c2 = (
 	^CharacterRangeParser between: c1 and: c2.
 )
-eoi = (
+public eoi = (
 	^EOIParser new
 )
-parseWithContext: ctxt ifError: onError = (
+public parseWithContext: ctxt ifError: onError = (
 	subclassResponsibility
 )
-star = (
+public star = (
 	^StarParser repeat: self
 )
-wrapper: block = (
+public wrapper: block = (
 	^WrappingParser wrap: self with: block
 )
-| q = (
+public | q = (
 	^AlternatingParser either: self or: q
 )) : ()
 class EOIParser = CombinatorialParser ()
 ('as yet unclassified'
-compress = (
+public compress = (
 	^self
 )
-parseWithContext: ctxt ifError: onError = (
+public parseWithContext: ctxt ifError: onError = (
 	ctxt atEnd ifTrue: [^nil].
 	onError value.
 )) : ()
@@ -92,22 +92,22 @@ class ForwardReferenceParser = CombinatorialParser (|
 forwardee
 |)
 ('as yet unclassified'
-bind: p = (
+public bind: p = (
 	assert: [forwardee isNil] message: ''.
 	forwardee:: p.
 )
-compress = (
+public compress = (
 	^forwardee compress
 )) : ()
 class ParserContext over: s = (|
 	content = s.
-	position ::= 0.
+	public position ::= 0.
 |)
 ('as yet unclassified'
-atEnd = (
+public atEnd = (
 	^position >= content size
 )
-next = (
+public next = (
 	position: position + 1.
 	^content at: position
 )) : ()
@@ -115,23 +115,23 @@ class SequencingParser subparsers: ps = CombinatorialParser (|
 	subparsers ::= ps.
 |)
 ('as yet unclassified'
-, p = (
+public , p = (
 	^SequencingParser subparsers: (subparsers copyWith: p)
 )
-compress = (
+public compress = (
 	compressed ifTrue: [^self].
 	compressed: true.
 	subparsers:: subparsers collect: [:e | e compress].
 	^self
 )
-parseWithContext: ctxt ifError: onError = (
+public parseWithContext: ctxt ifError: onError = (
 	^subparsers collect: [:p | p parseWithContext: ctxt ifError: onError]
 )
-wrapper: block = (
+public wrapper: block = (
 	^WrappingParser wrap: self with: [:results | block valueWithArguments: results]
 )) : ()
 class SimpleExpressionGrammar = CombinatorialParser (|
-start = ForwardReferenceParser new.
+public start = ForwardReferenceParser new.
 exp = ForwardReferenceParser new.
 e1 = ForwardReferenceParser new.
 e2 = ForwardReferenceParser new.
@@ -162,20 +162,20 @@ class StarParser repeat: p = CombinatorialParser (|
 p ::= p.
 |)
 ('as yet unclassified'
-compress = (
+public compress = (
 	compressed ifTrue: [^self].
 	compressed: true.
 	p:: p compress.
 	^self
 )
-parseWithContext: ctxt ifError: onError = (
+public parseWithContext: ctxt ifError: onError = (
 	| results = List new. |
 	[
 		| pos = ctxt position. |
 		results add: (p parseWithContext: ctxt ifError: [ctxt position: pos. ^results]).
 	] repeat.
 )
-wrapper: block = (
+public wrapper: block = (
 	^WrappingParser wrap: self with: [:results | block valueWithArguments: results]
 )) : ()
 class WrappingParser wrap: p with: b = CombinatorialParser (|
@@ -183,16 +183,16 @@ p ::= p.
 b = b.
 |)
 ('as yet unclassified'
-compress = (
+public compress = (
 	compressed ifTrue: [^self].
 	compressed: true.
 	p:: p compress.
 	^self
 )
-parseWithContext: ctxt ifError: onError = (
+public parseWithContext: ctxt ifError: onError = (
 	^b value: (p parseWithContext: ctxt ifError: onError)
 )) : ()'as yet unclassified'
-bench = (
+public bench = (
 	parser parseWithContext: (ParserContext over: theExpression) ifError: [parseFailed].
 )
 nextRandom = (
