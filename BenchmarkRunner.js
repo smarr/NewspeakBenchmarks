@@ -10,7 +10,7 @@ require('./ClosureDefFibonacci.js');
 require('./NLRImmediate.js');
 require('./NLRLoop.js');
 require('./Splay.js');
-require('./SplayHarder.js');
+//require('./SplayHarder.js');
 require('./DeltaBlue.js');
 require('./Richards.js');
 
@@ -56,7 +56,7 @@ SplaySetup();
 benchmark("Splay", function(){ SplayRun(); });
 SplayTearDown();
 
-SplayHarderSetup();
-benchmark("SplayHarder", function(){ SplayHarderRun(); });
-SplayHarderTearDown();
+//SplayHarderSetup();
+//benchmark("SplayHarder", function(){ SplayHarderRun(); });
+//SplayHarderTearDown();
 

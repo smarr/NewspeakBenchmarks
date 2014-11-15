@@ -35,7 +35,8 @@ class BenchmarkRunner {
   public static void main(String[] args) {
     new DeltaBlue().report();
     new MethodFibonacci().report();
+    new Richards().report();
     new Splay().report();
-    new SplayHarder().report();
+    //new SplayHarder().report();
   }
 }

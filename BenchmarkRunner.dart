@@ -9,7 +9,7 @@ import "ClosureDefFibonacci.dart";
 import "NLRImmediate.dart";
 import "NLRLoop.dart";
 import "Splay.dart";
-import "SplayHarder.dart";
+//import "SplayHarder.dart";
 import "DeltaBlue.dart";
 import "Richards.dart";
 import "ParserCombinators.dart";
@@ -63,9 +63,9 @@ main() {
   benchmark("Splay", () => new Splay().exercise());
   Splay.tearDown();
 
-  SplayHarder.mysetup();
-  benchmark("SplayHarder", () => new SplayHarder().exercise());
-  SplayHarder.tearDown();
+  //SplayHarder.mysetup();
+  //benchmark("SplayHarder", () => new SplayHarder().exercise());
+  //SplayHarder.tearDown();
 
   var parser = new SimpleExpressionGrammar().start.compress();
   var theExpression = randomExpression(20);
