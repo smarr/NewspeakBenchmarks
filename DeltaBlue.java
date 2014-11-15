@@ -464,9 +464,9 @@ class Planner {
 
   public void addConstraintsConsumingTo(Variable v, List<Constraint> list) {
     Constraint determining = v.determinedBy;
-    v.constraints.forEach(c -> {
+    for (Constraint c : v.constraints) {
       if (c != determining && c.isSatisfied()) list.add(c);
-    });
+    }
   }
 
   // Recompute the walkabout strengths and stay flags of all variables
@@ -531,9 +531,9 @@ class Planner {
   // constraints, usually a set of input constraints.
   public Plan extractPlanFromConstraints(List<Constraint> constraints) {
     List<Constraint> sources = new ArrayList<Constraint>();
-    constraints.forEach(c -> {
+    for (Constraint c : constraints) {
       if (c.isInput() && c.isSatisfied()) sources.add(c);
-    });
+    }
     return makePlan(sources);
   }
 
@@ -570,11 +570,11 @@ class Planner {
     c.markUnsatisfied();
     c.removeFromGraph();
     List<Constraint> unsatisfied = removePropagateFrom(out);
-    Strength.descendingStrengths.forEach(strength -> {
-      unsatisfied.forEach(u -> {
+    for (Strength strength : Strength.descendingStrengths) {
+      for (Constraint u : unsatisfied) {
         if (u.strength == strength) incrementalAdd(u);
-      });
-    });
+      }
+    }
   }
 
   // Extract a plan for resatisfaction starting from the given source
@@ -675,16 +675,16 @@ class Planner {
     todo.add(out);
     while (!todo.isEmpty()) {
       Variable v = todo.remove(todo.size()-1);
-      v.constraints.forEach(c -> {
+      for (Constraint c : v.constraints) {
         if (!c.isSatisfied()) unsatisfied.add(c);
-      });
+      };
       Constraint determining = v.determinedBy;
-      v.constraints.forEach(nextC -> {
+      for (Constraint nextC : v.constraints) {
         if (nextC != determining && nextC.isSatisfied()) {
           nextC.recalculate();
           todo.add(nextC.output());
         }
-      });
+      }
     }
     return unsatisfied;
   }
