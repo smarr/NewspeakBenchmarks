@@ -1,6 +1,6 @@
 Newspeak3
 'Benchmarks'
-class BenchmarkRunner packageUsing: ns = (
+class BenchmarkRunner packageUsing: manifest = (
 (*Infrastructure to run a set of benchmarks and gather average run times.
 
 Copyright 2012 Google Inc.
@@ -8,53 +8,55 @@ Copyright 2013 Ryan Macnak
 
 Licensed under the Apache License, Version 2.0 (the ''License''); you may not use this file except in compliance with the License.  You may obtain a copy of the License at  http://www.apache.org/licenses/LICENSE-2.0*)|
 	benchmarks = {
-		ns ClosureDefFibonacci.
-		ns ClosureFibonacci.
-		ns DeltaBlue.
-		ns MethodFibonacci.
-		ns NLRImmediate.
-		ns NLRLoop.
-		ns ParserCombinators.
-		ns Richards.		
-		ns SlotRead.
-		ns SlotWrite.
-		ns Splay.
+		manifest ClosureDefFibonacci.
+		manifest ClosureFibonacci.
+		manifest DeltaBlue.
+		manifest MethodFibonacci.
+		manifest NLRImmediate.
+		manifest NLRLoop.
+		(* manifest ParserCombinators. *)
+		manifest Richards.		
+		manifest SlotRead.
+		manifest SlotWrite.
+		(* manifest Splay. *)
 	}.
-|)
-(
+|) (
 class Benchmarking usingPlatform: p = (|
-private Time = p time Time.
+private Stopwatch = p kernel Stopwatch.
 private List = p collections OrderedCollection.
 private cachedPlatform = p.
-|)
-('as yet unclassified'
+|) (
+'as yet unclassified'
 measure: block forAtLeast: milliseconds = (
-	| runs start elapsed score |
+	| runs stopwatch elapsed score |
 	runs:: 0.
-	start:: Time millisecondClockValue.
+	stopwatch:: Stopwatch new start.
 	
 	[block value.
 	runs:: runs + 1.
-	elapsed:: Time millisecondClockValue - start.
+	elapsed:: stopwatch elapsedMilliseconds.
 	elapsed < milliseconds] whileTrue.
 	
-	score:: (round: runs * 1000.0 / elapsed to: 0.1) asFloat.
+	score:: (round: runs * 1000 asFloat / elapsed to: 0.1 asFloat) asFloat.
 	^score printString
 )
 public report = (
-	benchmarks do: [:benchmark |
+	benchmarks do: 
+		[:benchmark |
 		| b score |
 		b:: benchmark usingPlatform: cachedPlatform.
-
 		self measure: [b bench] forAtLeast: 300.
 		score:: measure: [b bench] forAtLeast: 2000.
-		(benchmark name, ': ', score) out.
-	].
-
+		(benchmark name, ': ', score) out].
 )
 round: n to: quantum = (
 	^(n // quantum) * quantum
-)) : ()'as yet unclassified'
+)
+) : (
+)
+'as yet unclassified'
 public main: p args: argv = (
 	(Benchmarking usingPlatform: p) report
-)) : ()
+)
+) : (
+)
