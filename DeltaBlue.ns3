@@ -18,36 +18,37 @@ private forward = Direction named: 'forward'.
 private backward = Direction named: 'backward'.
 
 private planner = Planner new.
-|)
-(
+|) (
 class Direction named: n = (|
 name <String> = n.
-|)
-() : ()
+|) (
+) : (
+)
 class Plan = (
 (* A Plan is an ordered list of constraints to be executed in sequence to resatisfy all currently satisfiable constraints in the face of one or more changing inputs. *)|
 private constraints = List new.
-|)
-('as yet unclassified'
+|) (
+'as yet unclassified'
 public addConstraint: c <Constraint> = (
 	constraints addLast: c.
 )
 public execute = (
 	(* Execute my constraints in order. *)
 	constraints do: [:c | c execute].
-)) : ()
+)
+) : (
+)
 class Planner = (
 (* I embody the DeltaBlue algorithm described in: ''The DeltaBlue Algorithm: An Incremental Constraint Hierarchy Solver'' by Bjorn N. Freeman-Benson and John Maloney. See January 1990 Communications of the ACM or University of Washington TR 89-08-06 for further details. *)|
 currentMark <Integer> ::= 0.
-|)
-(
+|) (
 class BinaryConstraint var: v1 var: v2 strength: s = Constraint strength: s (
 (* I am an abstract superclass for constraints having two possible output variables. *)|
 v1 <Variable> = v1.
 v2 <Variable> = v2.
 direction <Direction>
-|)
-('as yet unclassified'
+|) (
+'as yet unclassified'
 public addToGraph = (
 	(* Add myself to the constraint graph. *)
 	v1 addConstraint: self.
@@ -56,13 +57,13 @@ public addToGraph = (
 )
 protected chooseMethod: mark <Integer> = (
 	(* Decide if I can be satisfied and which way I should flow based on the relative strength of the variables I relate, and record that decision. *)
-	v1 mark == mark ifTrue:
-		[(v2 mark ~= mark and: [strength strongerThan: v2 walkStrength]) 
+	v1 mark = mark ifTrue:
+		[((v2 mark = mark) not and: [strength strongerThan: v2 walkStrength]) 
 			ifTrue: [direction:: forward] 
 			ifFalse: [direction:: nil].
 		^self].
-	v2 mark == mark ifTrue:
-		[(v1 mark ~= mark and: [strength strongerThan: v1 walkStrength]) 
+	v2 mark = mark ifTrue:
+		[((v1 mark = mark) not and: [strength strongerThan: v1 walkStrength]) 
 			ifTrue: [direction:: backward]
 			ifFalse: [direction:: nil].
 		^self].
@@ -80,11 +81,11 @@ protected chooseMethod: mark <Integer> = (
 )
 public input ^<Constraint> = (
 	(* Answer my current input variable *)
-	^direction == forward ifTrue: [v1] ifFalse: [v2]
+	^direction = forward ifTrue: [v1] ifFalse: [v2]
 )
 public inputsKnown: mark <Integer> ^<Boolean> = (
 	| in <Variable> = input. |
-	^in mark == mark or: [in stay or: [in determinedBy isNil]]
+	^in mark = mark or: [in stay or: [in determinedBy isNil]]
 )
 public isSatisfied ^<Boolean> = (
 	(* Answer true if this constraint is satisfied in the current solution. *)
@@ -100,7 +101,7 @@ public markUnsatisfied = (
 )
 public output ^<Constraint> = (
 	(* Answer my current output variable. *)
-	^direction == forward ifTrue: [v2] ifFalse: [v1]
+	^direction = forward ifTrue: [v2] ifFalse: [v1]
 )
 public recalculate = (
 	(* Calculate the walkabout strength, the stay flag, and, if it is 'stay', the value for the current output of this constraint. Assume this constraint is satisfied. *)
@@ -114,12 +115,14 @@ public removeFromGraph = (
 	v1 isNil ifFalse: [v1 removeConstraint: self].
 	v2 isNil ifFalse: [v2 removeConstraint: self].
 	direction:: nil.
-)) : ()
+)
+) : (
+)
 class Constraint strength: s = (
 (* I am an abstract class representing a system-maintainable relationship (or "constraint") between a set of variables. I supply a strength instance variable; concrete subclasses provide a means of storing the constrained variables and other information required to represent a constraint. *)|
 public strength <Strength> = s.
-|)
-('as yet unclassified'
+|) (
+'as yet unclassified'
 public addConstraint = (
 	(* Activate this constraint and attempt to satisfy it. *)
 	addToGraph.
@@ -179,7 +182,7 @@ public satisfy: mark <Integer> ^<Constraint> = (
 	| out <Variable> overridden <Constraint> |
 	chooseMethod: mark.
 	isSatisfied ifFalse:
-		[strength == required ifTrue:
+		[strength = required ifTrue:
 			[Error signal: 'Could not satisfy a required constraint'].
 		^nil].
 	(* constraint can be satisfied *)
@@ -192,30 +195,36 @@ public satisfy: mark <Integer> ^<Constraint> = (
 	(addPropagate: self mark: mark) ifFalse: [Error signal: 'Cycle encountered'].
 	out mark: mark.
 	^overridden
-)) : ()
+)
+) : (
+)
 class EditConstraint var: v strength: s = UnaryConstraint var: v strength: s (
-(* I am a unary input constraint used to mark a variable that the client wishes to change. *)addConstraint)
-('as yet unclassified'
+(* I am a unary input constraint used to mark a variable that the client wishes to change. *)addConstraint) (
+'as yet unclassified'
 public execute = (
 	(* Edit constraints do nothing. *)
 )
 public isInput ^<Boolean> = (
 	(* I indicate that a variable is to be changed by imperative code. *)
 	^true
-)) : ()
+)
+) : (
+)
 class EqualityConstraint var: v1 var: v2 strength: s = BinaryConstraint var: v1 var: v2 strength: s (
-(* I constrain two variables to have the same value: "v1 = v2". *)addConstraint)
-('as yet unclassified'
+(* I constrain two variables to have the same value: "v1 = v2". *)addConstraint) (
+'as yet unclassified'
 public execute = (
 	(* Enforce this constraint. Assume that it is satisfied. *)
 	output value: input value.
-)) : ()
+)
+) : (
+)
 class ScaleConstraint source: src scale: scale offset: offset destination: dest strength: s = BinaryConstraint var: src var: dest strength: s (
 (* I relate two variables by the linear scaling relationship: "v2 = (v1 * scale) + offset". Either v1 or v2 may be changed to maintain this relationship but the scale factor and offset are considered read-only. *)|
 	scale <Variable> = scale. (* scale factor input variable *)
 	offset <Variable> = offset. (* offset input variable *)
-|addConstraint)
-('as yet unclassified'
+|addConstraint) (
+'as yet unclassified'
 public addToGraph = (
 	(* Add myself to the constraint graph. *)
 	super addToGraph.
@@ -224,7 +233,7 @@ public addToGraph = (
 )
 public execute = (
 	(* Enforce this constraint. Assume that it is satisfied. *)
-	direction == forward
+	direction = forward
 		ifTrue: [v2 value: v1 value * scale value + offset value]
 		ifFalse: [v1 value: (v2 value - offset value) // scale value].
 )
@@ -246,19 +255,23 @@ public removeFromGraph = (
 	super removeFromGraph.
 	scale isNil ifFalse: [scale removeConstraint: self].
 	offset isNil ifFalse: [offset removeConstraint: self].
-)) : ()
+)
+) : (
+)
 class StayConstraint var: v strength: s = UnaryConstraint var: v strength: s (
-(* I mark variables that should, with some level of preference, stay the same. I have one method with zero inputs and one output, which does nothing. Planners may exploit the fact that, if I am satisfied, my output will not change during plan execution. This is called "stay optimization". *)addConstraint)
-('as yet unclassified'
+(* I mark variables that should, with some level of preference, stay the same. I have one method with zero inputs and one output, which does nothing. Planners may exploit the fact that, if I am satisfied, my output will not change during plan execution. This is called "stay optimization". *)addConstraint) (
+'as yet unclassified'
 public execute = (
 	(* Stay constraints do nothing. *)
-)) : ()
+)
+) : (
+)
 class UnaryConstraint var: v strength: s = Constraint strength: s (
 (* I am an abstract superclass for constraints having a single possible output variable. *)|
 public output <Variable> = v.
 protected satisfied <Boolean> ::= false.
-|)
-('as yet unclassified'
+|) (
+'as yet unclassified'
 public addToGraph = (
 	(* Add myself to the constraint graph. *)
 	output addConstraint: self.
@@ -266,7 +279,7 @@ public addToGraph = (
 )
 public chooseMethod: mark <Integer> = (
 	(* Decide if I can be satisfied and record that decision. *)
-	satisfied:: (output mark ~= mark and: [strength strongerThan: output walkStrength])
+	satisfied:: ((output mark = mark) not and: [strength strongerThan: output walkStrength])
 )
 public inputsKnown: mark <Integer> ^<Boolean> = (
 	^true
@@ -292,7 +305,9 @@ public removeFromGraph = (
 	(* Remove myself from the constraint graph. *)
 	output isNil ifFalse: [output removeConstraint: self].
 	satisfied: false.
-)) : ()
+)
+) : (
+)
 class Variable name: n initialValue: v = (
 (* I represent a constrained variable. In addition to my value, I maintain the structure of the constraint graph, the current dataflow graph, and various parameters of interest to the DeltaBlue incremental constraint solver. *)|
 public value <Integer> ::= v.
@@ -302,8 +317,8 @@ public mark <Integer> ::= 0.
 public walkStrength <Strength> ::= weakest.
 public stay <Boolean> ::= true.
 public name <String> = n.
-|)
-('as yet unclassified'
+|) (
+'as yet unclassified'
 public addConstraint: c <Constraint> = (
 	(* Add the given constraint to the set of all constraints that refer to me. *)
 	constraints addLast: c.
@@ -311,11 +326,14 @@ public addConstraint: c <Constraint> = (
 public removeConstraint: c <Constraint> = (
 	(* Remove all traces of c from this variable. *)
 	constraints remove: c ifAbsent: [].
-	determinedBy == c ifTrue: [determinedBy: nil].
-)) : ()'as yet unclassified'
+	determinedBy = c ifTrue: [determinedBy: nil].
+)
+) : (
+)
+'as yet unclassified'
 public addConstraintsConsuming: v <Variable> to: list <List[Constraints]> = (
 	| determining <Constraint> = v determinedBy. |
-	v constraints do: [:c | (c ~= determining and: [c isSatisfied]) ifTrue: [list addLast: c]].
+	v constraints do: [:c | ((c = determining) not and: [c isSatisfied]) ifTrue: [list addLast: c]].
 )
 public addPropagate: c <Constraint> mark: mark <Integer> ^<Boolean> = (
 	(* Recompute the walkabout strengths and stay flags of all variables downstream of the given constraint and recompute the actual values of all variables whose stay flag is true. If a cycle is detected, remove the given constraint and answer false. Otherwise, answer true. *)
@@ -324,7 +342,7 @@ public addPropagate: c <Constraint> mark: mark <Integer> ^<Boolean> = (
 	todo addLast: c.
 	[todo isEmpty] whileFalse: [
 		| d <Constraint> = todo removeLast. |
-		d output mark == mark ifTrue: [incrementalRemove: c. ^false].
+		d output mark = mark ifTrue: [incrementalRemove: c. ^false].
 		d recalculate.
 		addConstraintsConsuming: d output to: todo.
 	].
@@ -339,8 +357,8 @@ public chainTest: n = (
 		name:: 'v', i printString.	
 		v:: Variable name: name initialValue: 0.
 		prev isNil ifFalse: [EqualityConstraint var: prev var: v strength: required].
-		i == 1 ifTrue: [first:: v].
-		i == n ifTrue: [last:: v].
+		i = 1 ifTrue: [first:: v].
+		i = n ifTrue: [last:: v].
 		prev:: v.
 	].
 
@@ -352,7 +370,7 @@ public chainTest: n = (
 	1 to: n do: [:i |
 		first value: i.
 		plan execute.
-		last value == i ifFalse: [Error signal: 'Chain test failed!'].
+		last value = i ifFalse: [Error signal: 'Chain test failed!'].
 	].
 	editC destroyConstraint.
 )
@@ -393,7 +411,7 @@ public makePlan: sources <List[Constraint]> ^<Plan> = (
 	|
 	[todo isEmpty] whileFalse: [
 		| c <Constraint> = todo removeLast. |
-		(c output mark ~= mark and: [c inputsKnown: mark]) ifTrue: [
+		((c output mark = mark) not and: [c inputsKnown: mark]) ifTrue: [
 			(* not in plan already and eligible for inclusion *)
 			plan addConstraint: c.
 			c output mark: mark.
@@ -463,7 +481,7 @@ public removePropagateFrom: out <Variable> ^<List[Constraint]> = (
 		v constraints do: [:c | c isSatisfied ifFalse: [unsatisfied addLast: c]].
 		determining:: v determinedBy.
 		v constraints do: [:nextC | 
-			(nextC ~= determining and: [nextC isSatisfied])
+			((nextC = determining) not and: [nextC isSatisfied])
 				ifTrue: [nextC recalculate. todo addLast: nextC output]].
 	].
 	^unsatisfied
@@ -476,13 +494,15 @@ public setValueOf: var <Variable> to: newValue = (
 	plan:: extractPlanFromConstraints: editV.
 	10 timesRepeat: [var value: newValue. plan execute].
 	editC destroyConstraint.
-)) : ()
+)
+) : (
+)
 class Strength name: n value: v = (
 (* Strengths are used to measure the relative importance of constraints. New strengths may be inserted in the strength hierarchy without disrupting current constraints. Strengths cannot be created outside this class, so pointer comparison can be used for value comparison. *)|
 public name <String> = n.
 public value <Integer> = v.
-|)
-('as yet unclassified'
+|) (
+'as yet unclassified'
 public strongerThan: other <Strength> ^<Boolean> = (
 	^self value < other value
 )
@@ -494,8 +514,13 @@ public weakerThan: other <Strength> ^<Boolean> = (
 )
 public weakest: other <Strength> ^<Strength> = (
 	^(self weakerThan: other) ifTrue: [self] ifFalse: [other]
-)) : ()'as yet unclassified'
+)
+) : (
+)
+'as yet unclassified'
 public bench = (
 	planner chainTest: 100.
 	planner projectionTest: 100.
-)) : ()
+)
+) : (
+)

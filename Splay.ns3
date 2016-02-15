@@ -14,45 +14,49 @@ kTreePayloadDepth = 5.
 seed ::= 49734321.
 	
 tree <SplayTree>
-|mysetup)
-(
+|mysetup) (
 class Leaf withTag: tag = (|
 	string ::= 'String for key ',tag,' in leaf node'.
 	array ::= {0. 1. 2. 3. 4. 5. 6. 7. 8. 9}.
-|)
-() : ()
+|) (
+) : (
+)
 class Node key: k value: v = (|
 public key = k.
 public value = v.
 public left
 public right
-|)
-('as yet unclassified'
-traverse: f <[:Node]> = (
+|) (
+'as yet unclassified'
+public traverse: f <[:Node]> = (
 	(*Performs an ordered traversal of the subtree starting here.*)
 	| current ::= self. |
-	[current == nil] whileFalse:
+	[nil = current] whileFalse:
 		[ | left = current left. |
-		left == nil ifFalse: [left traverse: f].
+		nil = left ifFalse: [left traverse: f].
 		f value: current.
 		current: current right].
-)) : ()
+)
+) : (
+)
 class Payload left: l right: r = (|
 	left ::= l.
 	right ::= r.
-|)
-() : ('as yet unclassified'
+|) (
+) : (
+'as yet unclassified'
 public generate: depth with: tag = (
 	depth = 0 ifTrue: [^Leaf withTag: tag].
 	^Payload 
 		left: (generate: depth - 1 with: tag)
 		right: (generate: depth - 1 with: tag)
-))
+)
+)
 class SplayTree = (
 (*A splay tree is a self-balancing binary search tree with the additional property that recently accessed elements are quick to access again. It performs basic operations such as insertion, look-up and removal in O(log(n)) amortized time.*)|
 root <Node>
-|)
-('as yet unclassified'
+|) (
+'as yet unclassified'
 public at: key <Number> ^<Node> = (
 	(*Returns the node having the specified [key] or null if the tree doesn't contain a node with the specified [key].*)
 	
@@ -96,7 +100,7 @@ public findGreatestLessThan: key <Number> ^<Node> = (
 	splay: key.
 	(*Now the result is either the root node or the greatest node in the left subtree.*)
 	root key < key ifTrue: [^root].
-	root left == nil ifFalse: [^findMax: root left].
+	nil = root left ifFalse: [^findMax: root left].
 	^nil
 )
 findMax ^<Node> = (
@@ -106,11 +110,11 @@ findMax: start <Node> ^<Node> = (
 	| current |
 	isEmpty ifTrue: [^nil].
 	current: start.
-	[current right == nil] whileFalse: [current:: current right].
+	[nil = current right] whileFalse: [current:: current right].
 	^current
 )
 isEmpty = (
-	^root == nil
+	^nil = root
 )
 public removeKey: key <Number> ^<Node> = (
 	(*Removes a node with the specified key from the tree if the tree contains a node with this key. The removed node is returned. If [key] is not found, an exception is thrown.*)
@@ -120,7 +124,7 @@ public removeKey: key <Number> ^<Node> = (
 	splay: key.
 	root key = key ifFalse: [error: 'Key not found: ', key printString].
 	removed:: root.
-	root left == nil
+	nil = root left
 		ifTrue:
 			[root: root right]
 		ifFalse:
@@ -150,28 +154,28 @@ splay: key <Number> = (
 	
 	[
 		key < current key ifTrue: [
-			current left == nil ifTrue: [^break value].
+			nil = current left ifTrue: [^break value].
 			key < current left key ifTrue: [
 				(*Rotate right*)
 				| tmp = current left. |
 				current left: tmp right.
 				tmp right: current.
 				current: tmp.
-				current left == nil ifTrue: [^break value].
+				nil = current left ifTrue: [^break value].
 			].
 			(*Link right*)
 			right left: current.
 			right: current.
 			current: current left.
 		] ifFalse: [key > current key ifTrue: [
-			current right == nil ifTrue: [^break value].
+			nil = current right ifTrue: [^break value].
 			key > current right key ifTrue: [
 				(*Rotate left*)
 				| tmp = current right. |
 				current right: tmp left.
 				tmp left: current.
 				current: tmp.
-				current right == nil ifTrue: [^break value].
+				nil = current right ifTrue: [^break value].
 			].
 			(*Link left*)
 			left right: current.
@@ -181,7 +185,10 @@ splay: key <Number> = (
 			^break value
 		]].
 	] repeat.
-)) : ()'as yet unclassified'
+)
+) : (
+)
+'as yet unclassified'
 public bench = (
 	exercise.
 )
@@ -191,14 +198,14 @@ exercise = (
 		[ | key greatest |
 		key:: insertNewNode. 
 		greatest:: tree findGreatestLessThan: key.
-		greatest == nil 
+		nil = greatest
 			ifTrue: [tree removeKey: key]
 			ifFalse: [tree removeKey: greatest key]].
 )
 insertNewNode ^<Number> = (
 	| key <Number> payload |
 	[key: nextRandom.
-	(tree at: key) == nil] whileFalse.
+	nil = (tree at: key)] whileFalse.
 	payload:: Payload generate: kTreePayloadDepth with: key printString.
 	tree at: key put: payload.
 	^key
@@ -231,4 +238,6 @@ tearDown = (
 	1 to: length - 1 do: [:i |
 		(keys at: i) >= (keys at: i+1) ifTrue: [error: 'Splay tree not sorted', i printString].
     	].
-)) : ()
+)
+) : (
+)

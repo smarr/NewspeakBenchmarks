@@ -31,13 +31,12 @@ This version derived from the Dart Ton80 version. *)|
 	STATE_HELD = 4.
 	STATE_SUSPENDED_RUNNABLE = STATE_SUSPENDED bitOr: STATE_RUNNABLE.
 	STATE_NOT_HELD = STATE_HELD bitInvert.
-|)
-(
+|) (
 class DeviceTask on: s = Task on: s (
 (* A task that suspends itself after each time it has been run to simulate waiting for data from an external device. *)|
 protected pending <Packet>
-|)
-('as yet unclassified'
+|) (
+'as yet unclassified'
 public run: packet <Packet> ^<TaskControlBlock> = (
 	packet isNil ifTrue:
 		[ | functionWork <Packet> |
@@ -47,16 +46,18 @@ public run: packet <Packet> ^<TaskControlBlock> = (
 		^scheduler queue: functionWork].
 	pending:: packet.
 	^scheduler holdCurrent
-)) : ()
+)
+) : (
+)
 class HandlerTask on: s = Task on: s (
 (* A task that manipulates work packets and then suspends itself. *)|
 	workIn <Packet>
 	deviceIn <Packet>
-|)
-('as yet unclassified'
+|) (
+'as yet unclassified'
 public run: packet <Packet> ^<TaskControlBlock> = (
 	packet isNil ifFalse:
-		[packet kind == KIND_WORK
+		[packet kind = KIND_WORK
 			ifTrue: [workIn:: packet appendTo: workIn]
 			ifFalse: [deviceIn:: packet appendTo: deviceIn]].
 	workIn isNil ifFalse:
@@ -74,13 +75,15 @@ public run: packet <Packet> ^<TaskControlBlock> = (
 				workIn:: workIn link.
 				^scheduler queue: v]].
 	^scheduler suspendCurrent
-)) : ()
+)
+) : (
+)
 class IdleTask on: s with: ctrl with: cnt = Task on: s (
 (* An idle task doesn't do any work itself but cycles control between the two device tasks. *)|
 protected control <Integer> ::= ctrl. (* A seed value that controls how the device tasks are scheduled. *)
 protected count <Integer> ::= cnt. (* The number of times this task should be scheduled. *)
-|)
-('as yet unclassified'
+|) (
+'as yet unclassified'
 public run: packet <Packet> ^<TaskControlBlock> = (
 	count:: count - 1.
 	count = 0 ifTrue: [^scheduler holdCurrent].
@@ -89,7 +92,9 @@ public run: packet <Packet> ^<TaskControlBlock> = (
 		^scheduler release: ID_DEVICE_A].
 	control:: (control quo: 2) bitXor: 16rD008.
 	^scheduler release: ID_DEVICE_B
-)) : ()
+)
+) : (
+)
 class Packet link: l identity: i kind: k = (
 (* A simple package of data that is manipulated by the tasks.  The exact layout of the payload data carried by a packet is not importaint, and neither is the nature of the work performed on packets by the tasks. Besides carrying data, packets form linked lists and are hence used both as data and worklists. *)|
 public link <Packet> ::= l. (* The tail of the linked list of packets. *)
@@ -97,8 +102,8 @@ public identity <Integer> ::= i.  (* An ID for this packet. *)
 public kind <Integer> ::= k. (* The type of this packet. *)
 public datum <Integer> ::= 0.
 public data <Array[Integer]> = Array new: DATA_SIZE.
-|)
-('as yet unclassified'
+|) (
+'as yet unclassified'
 public appendTo: queueHead <Packet> ^<Packet> = (
 	(* Add this packet to the end of a worklist, and return the worklist. *)
 	| peek next |
@@ -109,7 +114,9 @@ public appendTo: queueHead <Packet> ^<Packet> = (
 		whileFalse: [next:: peek].
 	next link: self.
    	^queueHead
-)) : ()
+)
+) : (
+)
 class Scheduler = (
 (* A scheduler can be used to schedule a set of tasks based on their relative priorities.  Scheduling is done by maintaining a list of task control blocks which holds tasks and the data queue they are processing. *)|
 	public queueCount <Integer> ::= 0.
@@ -118,8 +125,8 @@ class Scheduler = (
 	currentId
 	list <TaskControlBlock>
 	blocks <Array[TaskControlBlock]> = Array new: NUMBER_OF_IDS.
-|)
-('as yet unclassified'
+|) (
+'as yet unclassified'
 public addDeviceTask: id <Integer> priority: priority <Integer> work: queue <Packet> = (
 	(* Add a device task to this scheduler. *)
 	addTask: id priority: priority work: queue task: (DeviceTask on: self).
@@ -181,15 +188,19 @@ public suspendCurrent ^<TaskControlBlock> = (
 	(* Suspend the currently executing task and return the next task control block to run. If new work is added to the suspended task it will be made runnable. *)
 	currentTcb markAsSuspended.
 	^currentTcb
-)) : ()
+)
+) : (
+)
 class Task on: s = (
 (* Abstract task that manipulates work packets. *)|
 protected scheduler <Scheduler> = s. (* The scheduler that manages this task. *)
-|)
-('as yet unclassified'
+|) (
+'as yet unclassified'
 public run: packet <Packet> = (
 	subclassResponsibility
-)) : ()
+)
+) : (
+)
 class TaskControlBlock link: l id: i priority: p queue: q task: t = (
 (* A task control block manages a task and the queue of work packages associated with it. *)|
 	public link <TaskControlBlock> = l.
@@ -198,8 +209,8 @@ class TaskControlBlock link: l id: i priority: p queue: q task: t = (
 	queue <Packet> ::= q.
 	task <Task> = t.
 	state <Integer> ::= queue isNil ifTrue: [STATE_SUSPENDED] ifFalse: [STATE_SUSPENDED_RUNNABLE].
-|)
-('as yet unclassified'
+|) (
+'as yet unclassified'
 public addInput: packet <Packet> checkPriority: oldTask <Task> ^<TaskControlBlock> = (
 	(* Adds a packet to the worklist of this block's task, marks this as runnable if necessary, and returns the next runnable object to run (the one with the highest priority. *)
 	queue isNil
@@ -212,8 +223,8 @@ public addInput: packet <Packet> checkPriority: oldTask <Task> ^<TaskControlBloc
 	^oldTask
 )
 public isHeldOrSuspended = (
-	^(state bitAnd: STATE_HELD) ~= 0
-		or: [state == STATE_SUSPENDED]
+	^((state bitAnd: STATE_HELD) = 0) not
+		or: [state = STATE_SUSPENDED]
 )
 public markAsHeld = (
 	state:: state bitOr: STATE_HELD.
@@ -230,7 +241,7 @@ public markAsSuspended = (
 public run ^<TaskControlBlock> = (
 	(* Runs this task, if it is ready to be run, and returns the next task to run. *)
 	| packet |
-	state == STATE_SUSPENDED_RUNNABLE ifTrue: [
+	state = STATE_SUSPENDED_RUNNABLE ifTrue: [
 		packet:: queue.
 		queue:: packet link.
 		state:: queue isNil ifTrue: [STATE_RUNNING] ifFalse: [STATE_RUNNABLE].	
@@ -239,13 +250,15 @@ public run ^<TaskControlBlock> = (
 )
 public setRunning = (
 	state:: STATE_RUNNING.
-)) : ()
+)
+) : (
+)
 class WorkerTask on: s with: v1 with: v2 = Task on: s (
 (* A task that manipulates work packets. *)|
 protected destination <Integer> ::= v1.
 protected count <Integer> ::= v2.
-|)
-('as yet unclassified'
+|) (
+'as yet unclassified'
 public run: packet <Packet> ^<TaskControlBlock> = (
 	packet isNil ifTrue: [^scheduler suspendCurrent].
 	destination = ID_HANDLER_A
@@ -259,7 +272,10 @@ public run: packet <Packet> ^<TaskControlBlock> = (
 		packet data at: i put: count.
 	].
 	^scheduler queue: packet
-)) : ()'as yet unclassified'
+)
+) : (
+)
+'as yet unclassified'
 public bench = (
 	| scheduler queue |
 	
@@ -289,4 +305,6 @@ public bench = (
 		ifFalse: [Error signal: 'bad scheduler queue-count'].
 	scheduler holdCount = 928
 		ifFalse: [Error signal: 'bad scheduler hold-count'].
-)) : ()
+)
+) : (
+)
