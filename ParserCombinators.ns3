@@ -32,13 +32,12 @@ theExpression <String> = randomExpression: 20.
 |theExpression size = 41137 ifFalse:
   [Error signal: 'Generated expression of the wrong size'].
 ((parser parseWithContext: (ParserContext over: theExpression) ifError: [parseFailed]) = 31615)
-  ifFalse: [Error signal: 'Expression evaluated to wrong value'])
-(
+  ifFalse: [Error signal: 'Expression evaluated to wrong value']) (
 class AlternatingParser either: p or: q = CombinatorialParser (|
 p <CombinatorialParser> ::= p.
 q <CombinatorialParser> ::= q.
-|)
-('as yet unclassified'
+|) (
+'as yet unclassified'
 public compress = (
 	compressed ifTrue: [^self].
 	compressed: true.
@@ -49,12 +48,14 @@ public compress = (
 public parseWithContext: ctxt ifError: onError = (
 	| pos = ctxt position. |
 	^p parseWithContext: ctxt ifError: [ctxt position: pos. ^q parseWithContext: ctxt ifError: onError]
-)) : ()
+)
+) : (
+)
 class CharacterRangeParser between: c1 and: c2 = CombinatorialParser (|
-lowerBound <Character> = c1.
-upperBound <Character> = c2.
-|)
-('as yet unclassified'
+lowerBound <Character> = (c1 runeAt: 1).
+upperBound <Character> = (c2 runeAt: 1).
+|) (
+'as yet unclassified'
 public compress = (
 	^self
 )
@@ -64,11 +65,13 @@ public parseWithContext: ctxt ifError: onError = (
 	c:: ctxt next.
 	(lowerBound <= c) & (c <= upperBound) ifTrue: [^c].
 	onError value.
-)) : ()
+)
+) : (
+)
 class CombinatorialParser = (|
 compressed <Boolean> ::= false.
-|)
-('as yet unclassified'
+|) (
+'as yet unclassified'
 public , p = (
 	^SequencingParser subparsers: {self. p}
 )
@@ -92,20 +95,24 @@ public wrapper: block = (
 )
 public | q = (
 	^AlternatingParser either: self or: q
-)) : ()
-class EOIParser = CombinatorialParser ()
-('as yet unclassified'
+)
+) : (
+)
+class EOIParser = CombinatorialParser () (
+'as yet unclassified'
 public compress = (
 	^self
 )
 public parseWithContext: ctxt ifError: onError = (
 	ctxt atEnd ifTrue: [^nil].
 	onError value.
-)) : ()
+)
+) : (
+)
 class ForwardReferenceParser = CombinatorialParser (|
 forwardee <CombinatorialParser>
-|)
-('as yet unclassified'
+|) (
+'as yet unclassified'
 public bind: p = (
 	forwardee isNil ifFalse: [Error signal: 'Forward reference parser already bound'].
 	forwardee:: p.
@@ -115,23 +122,28 @@ public compress = (
 )
 public parseWithContext: ctxt ifError: onError = (
 	Error signal: 'Forward reference parsers should be compressed away before parsing'
-)) : ()
+)
+) : (
+)
 class ParserContext over: s = (|
 	content <String> = s.
 	public position <Integer> ::= 0.
-|)
-('as yet unclassified'
+|) (
+'as yet unclassified'
 public atEnd = (
 	^position >= content size
 )
 public next = (
+	| rune |
 	position: position + 1.
-	^content at: position
-)) : ()
+	^content runeAt: position.
+)
+) : (
+)
 class SequencingParser subparsers: ps = CombinatorialParser (|
 	subparsers <List[CombinatorialParser]> ::= ps.
-|)
-('as yet unclassified'
+|) (
+'as yet unclassified'
 public , p = (
 	^SequencingParser subparsers: (subparsers copyWith: p)
 )
@@ -146,7 +158,9 @@ public parseWithContext: ctxt ifError: onError = (
 )
 public wrapper: block = (
 	^WrappingParser wrap: self with: [:results | block valueWithArguments: results]
-)) : ()
+)
+) : (
+)
 class SimpleExpressionGrammar = CombinatorialParser (|
 public start = ForwardReferenceParser new.
 exp = ForwardReferenceParser new.
@@ -167,18 +181,19 @@ e1 bind: (e2, (times, e2) star wrapper: [:lhs :rhss |
 e2 bind: (number | parenExp).
 	
 parenExp bind: (lparen, exp, rparen wrapper: [:lhs :e :rhs | e]).
-number bind: (digit wrapper: [:d | d asString asNumber]).
+number bind: (digit wrapper: [:d | d - 48]).
 	
 plus bind: (char: $+).
 times bind: (char: $*).
 digit bind: (charBetween: $0 and: $9).
 lparen bind: (char: $().
-rparen bind: (char: $)))
-() : ()
+rparen bind: (char: $))) (
+) : (
+)
 class StarParser repeat: p = CombinatorialParser (|
 subparser <CombinatorialParser> ::= p.
-|)
-('as yet unclassified'
+|) (
+'as yet unclassified'
 public compress = (
 	compressed ifTrue: [^self].
 	compressed: true.
@@ -195,12 +210,14 @@ public parseWithContext: ctxt ifError: onError = (
 )
 public wrapper: block = (
 	^WrappingParser wrap: self with: [:results | block valueWithArguments: results]
-)) : ()
+)
+) : (
+)
 class WrappingParser wrap: p with: t = CombinatorialParser (|
 subparser <CombintorialParser> ::= p.
 transform <Block> = t.
-|)
-('as yet unclassified'
+|) (
+'as yet unclassified'
 public compress = (
 	compressed ifTrue: [^self].
 	compressed: true.
@@ -209,7 +226,10 @@ public compress = (
 )
 public parseWithContext: ctxt ifError: onError = (
 	^transform value: (subparser parseWithContext: ctxt ifError: onError)
-)) : ()'as yet unclassified'
+)
+) : (
+)
+'as yet unclassified'
 public bench = (
 	parser parseWithContext: (ParserContext over: theExpression) ifError: [parseFailed].
 )
@@ -226,4 +246,6 @@ randomExpression: depth = (
 	m = 1 ifTrue: [^(randomExpression: depth-1),'*',(randomExpression: depth-1)].
 	m = 2 ifTrue: [^'(',(randomExpression: depth-1),')'].
 	halt.
-)) : ()
+)
+) : (
+)
