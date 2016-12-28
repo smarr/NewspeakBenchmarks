@@ -183,11 +183,11 @@ e2 bind: (number | parenExp).
 parenExp bind: (lparen, exp, rparen wrapper: [:lhs :e :rhs | e]).
 number bind: (digit wrapper: [:d | d - 48]).
 	
-plus bind: (char: $+).
-times bind: (char: $*).
-digit bind: (charBetween: $0 and: $9).
-lparen bind: (char: $().
-rparen bind: (char: $))) (
+plus bind: (char: "+").
+times bind: (char: "*").
+digit bind: (charBetween: "0" and: "9").
+lparen bind: (char: "(").
+rparen bind: (char: ")")) (
 ) : (
 )
 class StarParser repeat: p = CombinatorialParser (|
