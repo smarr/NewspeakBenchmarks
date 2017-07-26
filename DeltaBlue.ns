@@ -344,7 +344,7 @@ public chainTest: n = (
 	 editC <Constraint> editV <List[Constraint]> plan <Plan> |
 	1 to: n do: [:i |
 		| name v |
-		name:: 'v', i printString.	
+		name:: 'v' + i asString.
 		v:: Variable name: name initialValue: 0.
 		prev isNil ifFalse: [EqualityConstraint var: prev var: v strength: required].
 		i = 1 ifTrue: [first:: v].
@@ -423,8 +423,8 @@ public projectionTest: n <Integer> = (
 	offset:: Variable name: 'offset' initialValue: 1000.
 	dests:: List new.
 	0 to: n-1 do: [:i |
-		src:: Variable name: 'src', i printString initialValue: i.
-		dst:: Variable name: 'dst', i printString initialValue: i.
+		src:: Variable name: 'src' + i asString initialValue: i.
+		dst:: Variable name: 'dst' + i asString initialValue: i.
 		dests append: dst.
 		StayConstraint var: src strength: normal.
 		ScaleConstraint source: src scale: scale offset: offset destination: dst strength: required.

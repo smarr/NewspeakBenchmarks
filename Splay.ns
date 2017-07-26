@@ -201,8 +201,8 @@ exercise = (
 insertNewNode ^<Number> = (
 	| key <Number> payload |
 	nil = (tree at: key)] whileFalse.
-	payload:: Payload generate: kTreePayloadDepth with: key printString.
 	[key:: nextRandom.
+	payload:: Payload generate: kTreePayloadDepth with: key asString.
 	tree at: key put: payload.
 	^key
 )
