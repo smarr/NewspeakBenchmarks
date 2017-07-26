@@ -5,7 +5,7 @@ class Splay usingPlatform: p = (
 
 Copyright (c) 2012 Google Inc.
 Copyright (c) 2011, the Dart project authors.  Please see the AUTHORS file for details. All rights reserved. Use of this source code is governed by a BSD-style license that can be found in the LICENSE file.*)|
-List = p collections List.
+List = p kernel Vector.
 
 kTreeSize = 8000.
 kTreeModifications = 80.

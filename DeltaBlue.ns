@@ -2,7 +2,7 @@ Newspeak3
 'Benchmarks'
 class DeltaBlue usingPlatform: p = (
 (* One-way constraint solver, originally written in Smalltalk by John Maloney and Mario Wolczko. *)|
-private List = p collections List.
+private List = p kernel Vector.
 
 private required = Strength name: 'required' value: 0.
 private strongPreferred = Strength name: 'strongPreferred' value: 1.
@@ -29,7 +29,7 @@ class Plan = (
 private constraints = List new.
 |) (
 public addConstraint: c <Constraint> = (
-	constraints addLast: c.
+	constraints append: c.
 )
 public execute = (
 	(* Execute my constraints in order. *)
@@ -312,12 +312,12 @@ public name <String> = n.
 |) (
 public addConstraint: c <Constraint> = (
 	(* Add the given constraint to the set of all constraints that refer to me. *)
-	constraints addLast: c.
+	constraints append: c.
 )
 public removeConstraint: c <Constraint> = (
 	(* Remove all traces of c from this variable. *)
-	constraints remove: c ifAbsent: [].
-	determinedBy = c ifTrue: [determinedBy: nil].
+	constraints remove: c.
+	determinedBy == c ifTrue: [determinedBy: nil].
 )
 ) : (
 )
@@ -329,9 +329,9 @@ public addPropagate: c <Constraint> mark: mark <Integer> ^<Boolean> = (
 	(* Recompute the walkabout strengths and stay flags of all variables downstream of the given constraint and recompute the actual values of all variables whose stay flag is true. If a cycle is detected, remove the given constraint and answer false. Otherwise, answer true. *)
 	(* Details: Cycles are detected when a marked variable is encountered downstream of the given constraint. The sender is assumed to have marked the inputs of the given constraint with the given mark. Thus, encountering a marked node downstream of the output constraint means that there is a path from the constraint's output to one of its inputs. *)
 	| todo <List[Constraint]> = List new. |
-	todo addLast: c.
+	todo append: c.
 	[todo isEmpty] whileFalse: [
-		| d <Constraint> = todo removeLast. |
+		| d <Constraint> = todo remove. |
 		d output mark = mark ifTrue: [incrementalRemove: c. ^false].
 		d recalculate.
 		addConstraintsConsuming: d output to: todo.
@@ -355,7 +355,7 @@ public chainTest: n = (
 	StayConstraint var: last strength: strongDefault.
 	editC:: EditConstraint var: first strength: preferred.
 	editV:: List new.
-	editV addLast: editC.
+	editV append: editC.
 	plan:: extractPlanFromConstraints: editV.
 	1 to: n do: [:i |
 		first value: i.
@@ -367,7 +367,7 @@ public chainTest: n = (
 public extractPlanFromConstraints: constraints <List[Constraint]> ^<Plan> = (
 	(* Extract a plan for resatisfaction starting from the outputs of the given constraints, usually a set of input constraints. *)
 	| sources <List[Constraint]> = List new. |
-	constraints do: [:c | (c isInput and: [c isSatisfied]) ifTrue: [sources addLast: c]].
+	constraints do: [:c | (c isInput and: [c isSatisfied]) ifTrue: [sources append: c]].
 	^makePlan: sources
 )
 public incrementalAdd: c <Constraint> = (
@@ -400,7 +400,7 @@ public makePlan: sources <List[Constraint]> ^<Plan> = (
 	todo <List[Constraint]> = sources.
 	|
 	[todo isEmpty] whileFalse: [
-		| c <Constraint> = todo removeLast. |
+		| c <Constraint> = todo remove. |
 		((c output mark = mark) not and: [c inputsKnown: mark]) ifTrue: [
 			(* not in plan already and eligible for inclusion *)
 			plan addConstraint: c.
@@ -425,7 +425,7 @@ public projectionTest: n <Integer> = (
 	0 to: n-1 do: [:i |
 		src:: Variable name: 'src', i printString initialValue: i.
 		dst:: Variable name: 'dst', i printString initialValue: i.
-		dests addLast: dst.
+		dests append: dst.
 		StayConstraint var: src strength: normal.
 		ScaleConstraint source: src scale: scale offset: offset destination: dst strength: required.
 	].
@@ -451,7 +451,7 @@ public propagateFrom: v <Variable> = (
 	| todo <List[Constraint]> = List new. |
 	addConstraintsConsuming: v to: todo.
 	[todo isEmpty] whileFalse: [
-		| c <Constraint> = todo removeLast. |
+		| c <Constraint> = todo remove. |
 		c execute.
 		addConstraintsConsuming: c output to: todo.
 	].
@@ -464,15 +464,15 @@ public removePropagateFrom: out <Variable> ^<List[Constraint]> = (
 	out stay: true.
 	unsatisfied:: List new.
 	todo:: List new.
-	todo addLast: out.
+	todo append: out.
 	[todo isEmpty] whileFalse: [
 		| v <Variable> determining <Constraint> |
-		v:: todo removeLast.
-		v constraints do: [:c | c isSatisfied ifFalse: [unsatisfied addLast: c]].
+		v:: todo remove.
+		v constraints do: [:c | c isSatisfied ifFalse: [unsatisfied append: c]].
 		determining:: v determinedBy.
 			((nextC = determining) not and: [nextC isSatisfied])
-				ifTrue: [nextC recalculate. todo addLast: nextC output]].
 		v constraints do: [:nextC |
+				ifTrue: [nextC recalculate. todo append: nextC output]].
 	].
 	^unsatisfied
 )
@@ -480,7 +480,7 @@ public setValueOf: var <Variable> to: newValue = (
 	| editC <Constraint> editV <List[Constraint]> plan <Plan> |
 	editC:: EditConstraint var: var strength: preferred.
 	editV:: List new.
-	editV addLast: editC.
+	editV append: editC.
 	plan:: extractPlanFromConstraints: editV.
 	10 timesRepeat: [var value: newValue. plan execute].
 	editC destroyConstraint.
