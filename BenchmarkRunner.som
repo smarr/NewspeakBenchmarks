@@ -1,0 +1,63 @@
+class BenchmarkRunner usingPlatform: platform = (
+(*Infrastructure to run a set of benchmarks and gather average run times.
+
+Copyright 2012 Google Inc.
+Copyright 2013 Ryan Macnak
+
+Licensed under the Apache License, Version 2.0 (the ''License'');
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+  http://www.apache.org/licenses/LICENSE-2.0*)
+| system = platform system.
+  kernel = platform kernel.
+  platform = platform.
+	benchmarks = {
+    system loadModule: 'ClosureDefFibonacci.ns'.
+		system loadModule: 'ClosureFibonacci.ns'.
+		system loadModule: 'DeltaBlue.ns'.
+		system loadModule: 'MethodFibonacci.ns'.
+		system loadModule: 'NLRImmediate.ns'.
+		system loadModule: 'NLRLoop.ns'.
+		system loadModule: 'ParserCombinators.ns'.
+		system loadModule: 'Richards.ns'.
+		system loadModule: 'SlotRead.ns'.
+		system loadModule: 'SlotWrite.ns'.
+		system loadModule: 'Splay.ns'.
+	}.
+|)(
+  class Benchmarking new = (
+  | private Vector = kernel Vector.
+  |)(
+    measure: block forAtLeast: milliseconds = (
+      | runs startTime elapsed score |
+      runs:: 0.
+      startTime:: system ticks.
+
+      [ block value.
+        runs:: runs + 1.
+        elapsed:: system ticks - startTime.
+        elapsed < (milliseconds * 1000)] whileTrue: [].
+
+      score:: (round: runs // (elapsed / 1000000) to: 0.1).
+      ^ score asString
+    )
+    public report = (
+      benchmarks do:
+        [:benchmark |
+          | b score |
+          b:: benchmark usingPlatform: platform.
+          self measure: [b bench] forAtLeast: 15000.
+          'warmed up' println.
+          score:: measure: [b bench] forAtLeast: 15000.
+          (benchmark name + ': ' + score + ' runs/second') println].
+    )
+    round: n to: quantum = (
+      ^ (n // quantum) round * quantum
+    )
+  )
+
+  public main: args = (
+    Benchmarking new report.
+    ^ 0
+  )
+)
