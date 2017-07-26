@@ -422,7 +422,7 @@ public projectionTest: n <Integer> = (
 	scale:: Variable name: 'scale' initialValue: 10.
 	offset:: Variable name: 'offset' initialValue: 1000.
 	dests:: List new.
-	0 to: n-1 do: [:i |
+	0 to: n - 1 do: [:i |
 		src:: Variable name: 'src' + i asString initialValue: i.
 		dst:: Variable name: 'dst' + i asString initialValue: i.
 		dests append: dst.
