@@ -1,9 +1,10 @@
 Newspeak3
 'Benchmarks'
-class Richards usingPlatform: ignore = (
+class Richards usingPlatform: p = (
 (* An OS kernel simulation benchmark, originally written in BCPL by Martin Richards.
 
 This version derived from the Dart Ton80 version. *)|
+  Array = p kernel Array.
 
 	DATA_SIZE = 4.
 	COUNT = 1000.
@@ -294,7 +295,7 @@ public bench = (
 	scheduler schedule.
 
 	scheduler queueCount = 2322
-		ifFalse: [Error signal: 'bad scheduler queue-count'].
+		ifFalse: [ error: 'bad scheduler queue-count, was: ' + scheduler queueCount].
 	scheduler holdCount = 928
 		ifFalse: [Error signal: 'bad scheduler hold-count'].
 )
