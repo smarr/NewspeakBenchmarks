@@ -79,7 +79,7 @@ protected chooseMethod: mark <Integer> = (
 )
 public input ^<Constraint> = (
 	(* Answer my current input variable *)
-	^direction = forward ifTrue: [v1] ifFalse: [v2]
+	^direction == forward ifTrue: [v1] ifFalse: [v2]
 )
 public inputsKnown: mark <Integer> ^<Boolean> = (
 	| in <Variable> = input. |
@@ -99,7 +99,7 @@ public markUnsatisfied = (
 )
 public output ^<Constraint> = (
 	(* Answer my current output variable. *)
-	^direction = forward ifTrue: [v2] ifFalse: [v1]
+	^direction == forward ifTrue: [v2] ifFalse: [v1]
 )
 public recalculate = (
 	(* Calculate the walkabout strength, the stay flag, and, if it is 'stay', the value for the current output of this constraint. Assume this constraint is satisfied. *)
@@ -179,7 +179,7 @@ public satisfy: mark <Integer> ^<Constraint> = (
 	| out <Variable> overridden <Constraint> |
 	chooseMethod: mark.
 	isSatisfied ifFalse:
-		[strength = required ifTrue:
+		[strength == required ifTrue:
 			[Error signal: 'Could not satisfy a required constraint'].
 		^nil].
 	(* constraint can be satisfied *)
@@ -227,7 +227,7 @@ public addToGraph = (
 )
 public execute = (
 	(* Enforce this constraint. Assume that it is satisfied. *)
-	direction = forward
+	direction == forward
 		ifTrue: [v2 value: v1 value * scale value + offset value]
 		ifFalse: [v1 value: (v2 value - offset value) // scale value].
 )
@@ -323,7 +323,7 @@ public removeConstraint: c <Constraint> = (
 )
 public addConstraintsConsuming: v <Variable> to: list <List[Constraints]> = (
 	| determining <Constraint> = v determinedBy. |
-	v constraints do: [:c | ((c = determining) not and: [c isSatisfied]) ifTrue: [list addLast: c]].
+	v constraints do: [:c | ((c == determining) not and: [c isSatisfied]) ifTrue: [list append: c]].
 )
 public addPropagate: c <Constraint> mark: mark <Integer> ^<Boolean> = (
 	(* Recompute the walkabout strengths and stay flags of all variables downstream of the given constraint and recompute the actual values of all variables whose stay flag is true. If a cycle is detected, remove the given constraint and answer false. Otherwise, answer true. *)
@@ -386,9 +386,9 @@ public incrementalRemove: c <Constraint>  = (
 	c markUnsatisfied.
 	c removeFromGraph.
 	unsatisfied:: removePropagateFrom: out.
-			u strength = strength
 	descendingStrengths do: [:strength |
 		unsatisfied do: [:u |
+			u strength == strength
 				ifTrue: [incrementalAdd: u]]].
 )
 public makePlan: sources <List[Constraint]> ^<Plan> = (
@@ -470,8 +470,8 @@ public removePropagateFrom: out <Variable> ^<List[Constraint]> = (
 		v:: todo remove.
 		v constraints do: [:c | c isSatisfied ifFalse: [unsatisfied append: c]].
 		determining:: v determinedBy.
-			((nextC = determining) not and: [nextC isSatisfied])
 		v constraints do: [:nextC |
+			((nextC == determining) not and: [nextC isSatisfied])
 				ifTrue: [nextC recalculate. todo append: nextC output]].
 	].
 	^unsatisfied
