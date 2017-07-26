@@ -15,4 +15,7 @@ fib = (
 	^f
 )
 ) : (
+	public name = (
+		^ 'ClosureFibonacci'
+	)
 )

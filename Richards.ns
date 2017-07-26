@@ -298,4 +298,7 @@ public bench = (
 		ifFalse: [Error signal: 'bad scheduler hold-count'].
 )
 ) : (
+	public name = (
+		^ 'Richards'
+	)
 )

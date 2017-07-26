@@ -8,4 +8,7 @@ nlr = (
 	self array do: [:each | 4 = each ifTrue: [^each]].
 )
 ) : (
+	public name = (
+		^ 'NLRLoop'
+	)
 )

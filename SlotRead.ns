@@ -8,4 +8,7 @@ public bench = (
 		slot. slot. slot. slot. slot].
 )
 ) : (
+	public name = (
+		^ 'SlotRead'
+	)
 )

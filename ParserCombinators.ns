@@ -238,4 +238,7 @@ randomExpression: depth = (
 	halt.
 )
 ) : (
+	public name = (
+		^ 'ParserCombinators'
+	)
 )

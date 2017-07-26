@@ -236,4 +236,7 @@ tearDown = (
     	].
 )
 ) : (
+	public name = (
+		^ 'Splay'
+	)
 )
