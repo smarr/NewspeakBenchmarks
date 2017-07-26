@@ -31,7 +31,7 @@ This version derived from the Dart Ton80 version. *)|
 	(* The task is blocked and cannot be run until it is explicitly released. *)
 	STATE_HELD = 4.
 	STATE_SUSPENDED_RUNNABLE = STATE_SUSPENDED bitOr: STATE_RUNNABLE.
-	STATE_NOT_HELD = STATE_HELD bitInvert.
+	STATE_NOT_HELD = -1 - STATE_HELD.
 |) (
 class DeviceTask on: s = Task on: s (
 (* A task that suspends itself after each time it has been run to simulate waiting for data from an external device. *)|
@@ -85,8 +85,8 @@ protected count <Integer> ::= cnt. (* The number of times this task should be sc
 public run: packet <Packet> ^<TaskControlBlock> = (
 	count:: count - 1.
 	count = 0 ifTrue: [^scheduler holdCurrent].
-	(control bitAnd: 1) = 0 ifTrue:
 		[control:: control quo: 2.
+	(control & 1) = 0 ifTrue:
 		^scheduler release: ID_DEVICE_A].
 	control:: (control quo: 2) bitXor: 16rD008.
 	^scheduler release: ID_DEVICE_B
@@ -217,14 +217,14 @@ public addInput: packet <Packet> checkPriority: oldTask <Task> ^<TaskControlBloc
 	^oldTask
 )
 public isHeldOrSuspended = (
-	^((state bitAnd: STATE_HELD) = 0) not
+	^((state & STATE_HELD) = 0) not
 		or: [state = STATE_SUSPENDED]
 )
 public markAsHeld = (
 	state:: state bitOr: STATE_HELD.
 )
 public markAsNotHeld = (
-	state:: state bitAnd: STATE_NOT_HELD.
+	state:: state & STATE_NOT_HELD.
 )
 public markAsRunnable = (
 	state:: state bitOr: STATE_RUNNABLE.

@@ -225,7 +225,7 @@ public bench = (
 )
 nextRandom = (
 	seed:: seed * 16rDEAD + 16rC0DE.
-	seed:: seed bitAnd: 16rFFF.
+	seed:: seed & 16rFFF.
 	^seed
 )
 randomExpression: depth = (

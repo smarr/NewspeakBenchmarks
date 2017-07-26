@@ -212,13 +212,21 @@ mysetup = (
 )
 nextRandom = (
 	(*Robert Jenkins' 32 bit integer hash function.*)
-	seed:: ((seed + 16r7ED55D16) + (seed << 12)) bitAnd: 16rFFFFFFFF.
-	seed:: ((seed bitXor: 16rC761C23C) bitXor: (seed >> 19)) bitAnd: 16rFFFFFFFF.
-	seed:: ((seed + 16r165667B1) + (seed << 5)) bitAnd: 16rFFFFFFFF.
-	seed:: ((seed + 16rD3A2646C) bitXor: (seed << 9)) bitAnd: 16rFFFFFFFF.
-	seed:: ((seed + 16rFD7046C5) + (seed << 3)) bitAnd: 16rFFFFFFFF.
-	seed:: ((seed bitXor: 16rB55A4F09) bitXor: (seed >> 16)) bitAnd: 16rFFFFFFFF.
-	^ (seed bitAnd: 16rFFFFFFF) asFloat / 16r10000000
+	seed:: ((seed       + 16r7ED55D16)       + (seed as32BitUnsignedValue  << 12) as32BitSignedValue) as32BitSignedValue.
+  seed:: ((seed bitXor: 16rC761C23C) bitXor: (seed as32BitUnsignedValue >>> 19)) as32BitSignedValue.
+  seed:: ((seed       + 16r165667B1)       + (seed as32BitUnsignedValue  <<  5) as32BitSignedValue) as32BitSignedValue.
+  seed:: ((seed       + 16rD3A2646C) bitXor: (seed as32BitUnsignedValue  <<  9) as32BitSignedValue) as32BitSignedValue.
+  seed:: ((seed       + 16rFD7046C5)       + (seed as32BitUnsignedValue  <<  3) as32BitSignedValue) as32BitSignedValue.
+  seed:: ((seed bitXor: 16rB55A4F09) bitXor: (seed as32BitUnsignedValue >>> 16)) as32BitSignedValue.
+
+	(* seed:: ((seed + 16r7ED55D16) + (seed << 12)) & 16rFFFFFFFF.
+	seed:: ((seed bitXor: 16rC761C23C) bitXor: (seed >> 19)) & 16rFFFFFFFF.
+	seed:: ((seed + 16r165667B1) + (seed << 5)) & 16rFFFFFFFF.
+	seed:: ((seed + 16rD3A2646C) bitXor: (seed << 9)) & 16rFFFFFFFF.
+	seed:: ((seed + 16rFD7046C5) + (seed << 3)) & 16rFFFFFFFF.
+	seed:: ((seed bitXor: 16rB55A4F09) bitXor: (seed >> 16)) & 16rFFFFFFFF.
+	^ (seed & 16rFFFFFFF) asFloat / 16r10000000 *)
+	^ seed
 )
 tearDown = (
 	(*Allow the garbage collector to reclaim the memory used by the splay tree no matter how we exit the tear down function.*)
