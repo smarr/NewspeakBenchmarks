@@ -1,9 +1,10 @@
 Newspeak3
 'Benchmarks'
 class Richards usingPlatform: ignore = (
-(* An OS kernel simulation benchmark, originally written in BCPL by Martin Richards. 
+(* An OS kernel simulation benchmark, originally written in BCPL by Martin Richards.
 
 This version derived from the Dart Ton80 version. *)|
+
 	DATA_SIZE = 4.
 	COUNT = 1000.
 
@@ -17,16 +18,16 @@ This version derived from the Dart Ton80 version. *)|
 
 	KIND_DEVICE = 0.
 	KIND_WORK = 1.
-	
+
 	(* The task is running and is currently scheduled. *)
 	STATE_RUNNING = 0.
-	
+
 	(* The task has packets left to process. *)
 	STATE_RUNNABLE = 1.
-	
+
 	(* The task is not currently running. The task is not blocked as such and may be started by the scheduler. *)
 	STATE_SUSPENDED = 2.
-	
+
 	(* The task is blocked and cannot be run until it is explicitly released. *)
 	STATE_HELD = 4.
 	STATE_SUSPENDED_RUNNABLE = STATE_SUSPENDED bitOr: STATE_RUNNABLE.
@@ -237,7 +238,7 @@ public run ^<TaskControlBlock> = (
 	state = STATE_SUSPENDED_RUNNABLE ifTrue: [
 		packet:: queue.
 		queue:: packet link.
-		state:: queue isNil ifTrue: [STATE_RUNNING] ifFalse: [STATE_RUNNABLE].	
+		state:: queue isNil ifTrue: [STATE_RUNNING] ifFalse: [STATE_RUNNABLE].
 	].
 	^task run: packet
 )
@@ -269,7 +270,7 @@ public run: packet <Packet> ^<TaskControlBlock> = (
 )
 public bench = (
 	| scheduler queue |
-	
+
 	scheduler:: Scheduler new.
 	scheduler addIdleTask: ID_IDLE priority: 0 work: nil state: COUNT.
 	queue:: Packet link: nil identity: ID_WORKER kind: KIND_WORK.

@@ -6,13 +6,13 @@ class Splay usingPlatform: p = (
 Copyright (c) 2012 Google Inc.
 Copyright (c) 2011, the Dart project authors.  Please see the AUTHORS file for details. All rights reserved. Use of this source code is governed by a BSD-style license that can be found in the LICENSE file.*)|
 List = p collections List.
-	
+
 kTreeSize = 8000.
 kTreeModifications = 80.
 kTreePayloadDepth = 5.
-	
+
 seed ::= 49734321.
-	
+
 tree <SplayTree>
 |mysetup) (
 class Leaf withTag: tag = (|
@@ -45,7 +45,7 @@ class Payload left: l right: r = (|
 ) : (
 public generate: depth with: tag = (
 	depth = 0 ifTrue: [^Leaf withTag: tag].
-	^Payload 
+	^Payload
 		left: (generate: depth - 1 with: tag)
 		right: (generate: depth - 1 with: tag)
 )
@@ -56,7 +56,7 @@ root <Node>
 |) (
 public at: key <Number> ^<Node> = (
 	(*Returns the node having the specified [key] or null if the tree doesn't contain a node with the specified [key].*)
-	
+
 	isEmpty ifTrue: [^nil].
 	splay: key.
 	^root key = key ifTrue: [root] ifFalse: [nil]
@@ -64,16 +64,16 @@ public at: key <Number> ^<Node> = (
 public at: key <Number> put: value = (
 	(*Inserts a node into the tree with the specified [key] and value if the tree does not already contain a node with the specified key. If the value is inserted, it becomes the root of the tree.*)
 	| node |
-	
+
 	isEmpty ifTrue: [root:: Node key: key value: value. ^self].
-	
+
 	(*Splay on the key to move the last node on the search path for the key to the root of the tree.*)
 	splay: key.
-	
+
 	root key = key ifTrue: [^self].
 	node:: Node key: key value: value.
 	key > root key
-		ifTrue: 
+		ifTrue:
 			[node left: root.
 			node right: root right.
 			root right: nil]
@@ -92,7 +92,7 @@ public exportKeys ^<List[Number]> = (
 public findGreatestLessThan: key <Number> ^<Node> = (
 	(*Returns the Node having the maximum key value that is less than the specified [key].*)
 	isEmpty ifTrue: [^nil].
-	
+
 	(*Splay on the key to move the node with the given key or the last node on the search path to the top of the tree.*)
 	splay: key.
 	(*Now the result is either the root node or the greatest node in the left subtree.*)
@@ -116,7 +116,7 @@ isEmpty = (
 public removeKey: key <Number> ^<Node> = (
 	(*Removes a node with the specified key from the tree if the tree contains a node with this key. The removed node is returned. If [key] is not found, an exception is thrown.*)
 	| removed |
-	
+
 	isEmpty ifTrue: [error: 'Key not found: ', key printString].
 	splay: key.
 	root key = key ifFalse: [error: 'Key not found: ', key printString].
@@ -131,24 +131,24 @@ public removeKey: key <Number> ^<Node> = (
 			splay: key.
 			(*Insert the original right child as the right child of the new root.*)
 			root right: right].
-	^removed	
+	^removed
 )
 splay: key <Number> = (
 	(*Perform the splay operation for the given key. Moves the node with the given key to the top of the tree.  If no node has the given key, the last node on the search path is moved to the top of the tree. This is the simplified top-down splaying algorithm from: ''Self-adjusting Binary Search Trees'' by Sleator and Tarjan*)
 	| dummy left right current break |
-	
+
 	isEmpty ifTrue: [^self].
 	dummy:: Node key: nil value: nil.
 	left:: right:: dummy.
 	current:: root.
-	
+
 	break::
 		[left right: current left.
 		right left: current right.
 		current left: dummy right.
 		current right: dummy left.
 		root: current].
-	
+
 	[
 		key < current key ifTrue: [
 			nil = current left ifTrue: [^break value].
@@ -190,9 +190,9 @@ public bench = (
 )
 exercise = (
 	(*Replace a few nodes in the splay tree.*)
-	kTreeModifications timesRepeat: 
+	kTreeModifications timesRepeat:
 		[ | key greatest |
-		key:: insertNewNode. 
+		key:: insertNewNode.
 		greatest:: tree findGreatestLessThan: key.
 		nil = greatest
 			ifTrue: [tree removeKey: key]
@@ -229,7 +229,7 @@ tearDown = (
 	(*Verify that the splay tree has the right size.*)
 	length:: keys size.
 	length = kTreeSize ifFalse: [error: 'Splay tree has wrong size'].
-	
+
  	(*Verify that the splay tree has sorted, unique keys.*)
 	1 to: length - 1 do: [:i |
 		(keys at: i) >= (keys at: i+1) ifTrue: [error: 'Splay tree not sorted', i printString].

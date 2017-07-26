@@ -56,19 +56,19 @@ public addToGraph = (
 protected chooseMethod: mark <Integer> = (
 	(* Decide if I can be satisfied and which way I should flow based on the relative strength of the variables I relate, and record that decision. *)
 	v1 mark = mark ifTrue:
-		[((v2 mark = mark) not and: [strength strongerThan: v2 walkStrength]) 
-			ifTrue: [direction:: forward] 
+		[((v2 mark = mark) not and: [strength strongerThan: v2 walkStrength])
+			ifTrue: [direction:: forward]
 			ifFalse: [direction:: nil].
 		^self].
 	v2 mark = mark ifTrue:
-		[((v1 mark = mark) not and: [strength strongerThan: v1 walkStrength]) 
+		[((v1 mark = mark) not and: [strength strongerThan: v1 walkStrength])
 			ifTrue: [direction:: backward]
 			ifFalse: [direction:: nil].
 		^self].
 
 	(* If we get here, neither variable is marked, so we have a choice. *)
     	(v1 walkStrength weakerThan: v2 walkStrength)
-		ifTrue: 
+		ifTrue:
 			[direction:: (strength strongerThan: v1 walkStrength)
 				ifTrue: [backward]
 				ifFalse: [nil]]
@@ -342,7 +342,7 @@ public chainTest: n = (
 	(* This is the standard DeltaBlue benchmark. A long chain of equality constraints is constructed with a stay constraint on one end. An edit constraint is then added to the opposite end and the time is measured for adding and removing this constraint, and extracting and executing a constraint satisfaction plan. There are two cases. In case 1, the added constraint is stronger than the stay constraint and values must propagate down the entire length of the chain. In case 2, the added constraint is weaker than the stay constraint so it cannot be accommodated. The cost in this case is, of course, very low. Typical situations lie somewhere between these two extremes. *)
 	| prev <Variable> first <Variable> last <Variable>
 	 editC <Constraint> editV <List[Constraint]> plan <Plan> |
-	1 to: n do: [:i | 
+	1 to: n do: [:i |
 		| name v |
 		name:: 'v', i printString.	
 		v:: Variable name: name initialValue: 0.
@@ -386,9 +386,9 @@ public incrementalRemove: c <Constraint>  = (
 	c markUnsatisfied.
 	c removeFromGraph.
 	unsatisfied:: removePropagateFrom: out.
-	descendingStrengths do: [:strength | 
-		unsatisfied do: [:u | 
 			u strength = strength
+	descendingStrengths do: [:strength |
+		unsatisfied do: [:u |
 				ifTrue: [incrementalAdd: u]]].
 )
 public makePlan: sources <List[Constraint]> ^<Plan> = (
@@ -429,18 +429,18 @@ public projectionTest: n <Integer> = (
 		StayConstraint var: src strength: normal.
 		ScaleConstraint source: src scale: scale offset: offset destination: dst strength: required.
 	].
-	
+
 	setValueOf: src to: 17.
 	dst value = 1170 ifFalse: [Error signal: 'Projection test 1 failed!'].
-	
+
 	setValueOf: dst to: 1050.
 	src value = 5 ifFalse: [Error signal: 'Projection test 2 failed!'].
-	
+
 	setValueOf: scale to: 5.
 	0 to: n - 2 do:
 		[:i | (dests at: i + 1) value = (i * 5 + 1000)
 			ifFalse: [Error signal: 'Projection test 3 failed!'] ].
-	
+
 	setValueOf: offset to: 2000.
 	0 to: n - 2 do:
 		[:i | (dests at: i + 1) value = (i * 5 + 2000)
@@ -470,9 +470,9 @@ public removePropagateFrom: out <Variable> ^<List[Constraint]> = (
 		v:: todo removeLast.
 		v constraints do: [:c | c isSatisfied ifFalse: [unsatisfied addLast: c]].
 		determining:: v determinedBy.
-		v constraints do: [:nextC | 
 			((nextC = determining) not and: [nextC isSatisfied])
 				ifTrue: [nextC recalculate. todo addLast: nextC output]].
+		v constraints do: [:nextC |
 	].
 	^unsatisfied
 )
