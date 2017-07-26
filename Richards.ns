@@ -106,7 +106,7 @@ public appendTo: queueHead <Packet> ^<Packet> = (
 	| peek next |
 	link: nil.
 	queueHead isNil ifTrue: [^self].
-	next: queueHead.
+	next:: queueHead.
 	[(peek:: next link) isNil]
 		whileFalse: [next:: peek].
 	next link: self.

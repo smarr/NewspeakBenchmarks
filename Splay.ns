@@ -106,7 +106,7 @@ findMax ^<Node> = (
 findMax: start <Node> ^<Node> = (
 	| current |
 	isEmpty ifTrue: [^nil].
-	current: start.
+	current:: start.
 	[nil = current right] whileFalse: [current:: current right].
 	^current
 )
@@ -157,13 +157,13 @@ splay: key <Number> = (
 				| tmp = current left. |
 				current left: tmp right.
 				tmp right: current.
-				current: tmp.
+				current:: tmp.
 				nil = current left ifTrue: [^break value].
 			].
 			(*Link right*)
 			right left: current.
-			right: current.
-			current: current left.
+			right:: current.
+			current:: current left.
 		] ifFalse: [key > current key ifTrue: [
 			nil = current right ifTrue: [^break value].
 			key > current right key ifTrue: [
@@ -171,13 +171,13 @@ splay: key <Number> = (
 				| tmp = current right. |
 				current right: tmp left.
 				tmp left: current.
-				current: tmp.
+				current:: tmp.
 				nil = current right ifTrue: [^break value].
 			].
 			(*Link left*)
 			left right: current.
-			left: current.
-			current: current right.
+			left:: current.
+			current:: current right.
 		] ifFalse: [
 			^break value
 		]].
@@ -200,9 +200,9 @@ exercise = (
 )
 insertNewNode ^<Number> = (
 	| key <Number> payload |
-	[key: nextRandom.
 	nil = (tree at: key)] whileFalse.
 	payload:: Payload generate: kTreePayloadDepth with: key printString.
+	[key:: nextRandom.
 	tree at: key put: payload.
 	^key
 )
