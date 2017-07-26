@@ -181,7 +181,8 @@ splay: key <Number> = (
 		] ifFalse: [
 			^break value
 		]].
-	] repeat.
+		true
+	] whileTrue:[].
 )
 ) : (
 )
@@ -200,8 +201,8 @@ exercise = (
 )
 insertNewNode ^<Number> = (
 	| key <Number> payload |
-	nil = (tree at: key)] whileFalse.
 	[key:: nextRandom.
+	nil = (tree at: key)] whileFalse: [].
 	payload:: Payload generate: kTreePayloadDepth with: key asString.
 	tree at: key put: payload.
 	^key
