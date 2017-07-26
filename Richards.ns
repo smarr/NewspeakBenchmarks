@@ -85,10 +85,10 @@ protected count <Integer> ::= cnt. (* The number of times this task should be sc
 public run: packet <Packet> ^<TaskControlBlock> = (
 	count:: count - 1.
 	count = 0 ifTrue: [^scheduler holdCurrent].
-		[control:: control quo: 2.
 	(control & 1) = 0 ifTrue:
+		[control:: control >>> 1.
 		^scheduler release: ID_DEVICE_A].
-	control:: (control quo: 2) bitXor: 16rD008.
+	control:: (control >>> 1) bitXor: 16rD008.
 	^scheduler release: ID_DEVICE_B
 )
 ) : (
